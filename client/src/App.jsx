@@ -1,8 +1,9 @@
 import { ScheduleComponent, Day, Week, WorkWeek, Month, Agenda, Inject } from '@syncfusion/ej2-react-schedule';
 import './App.css';
 
+
 function App () {
-  const data = [
+  const data = [ // Filler meeting for example
     {
       Id: 1,
       Subject: 'Meeting - 1',
@@ -13,8 +14,11 @@ function App () {
 
   const eventSettings = { dataSource: data };
 
+  function Button () {
+  };
+
   return (
-    <ScheduleComponent eventSettings={eventSettings}>
+    <ScheduleComponent eventSettings={eventSettings} width="80vw" height="80vh" className="roster-positon">
       <Inject services={[Day, Week, WorkWeek, Month, Agenda]} />
     </ScheduleComponent>
   );
