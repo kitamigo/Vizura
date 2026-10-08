@@ -1,7 +1,0 @@
-@import "../node_modules/@syncfusion/ej2-tailwind3-theme/styles/schedule/index.css";
-
-.roster-position {
-    position: absolute;
-    bottom: 10;
-    right: 10;
-}
