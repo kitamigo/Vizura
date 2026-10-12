@@ -3,9 +3,14 @@ const axios = require('axios')
 let latestAnalyticsSnapshot = null
 let latestUpload = null
 let latestCsvContent = null
+let latestDataPoints = []
 
 function getLatestCsvContent() {
   return latestCsvContent
+}
+
+function getLatestDataPoints() {
+  return latestDataPoints
 }
 
 // -- AI SERVICE BASE URL -- //
@@ -30,6 +35,24 @@ function createEmptySnapshot() {
   }
 }
 
+function getHolidayMap(csvContent) {
+  if (!csvContent) return {}
+  const lines = csvContent.trim().split('\n')
+  const headers = lines[0].toLowerCase().split(',')
+  const dateIdx = headers.indexOf('date')
+  const holidayIdx = headers.indexOf('holiday_name')
+  if (dateIdx === -1 || holidayIdx === -1) return {}
+
+  const map = {}
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',')
+    const date = cols[dateIdx]?.trim()
+    const holiday = cols[holidayIdx]?.trim()
+    if (date && holiday) map[date] = holiday
+  }
+  return map
+}
+
 // Parser for AI service (Converts CSV to data points) //
 function parseCsvToDataPoints(csvString) {
   const lines = csvString.trim().split('\n')
@@ -38,10 +61,9 @@ function parseCsvToDataPoints(csvString) {
   const headers = lines[0].toLowerCase().split(',')
   const dateIdx = headers.findIndex(h => h.trim() === 'date')
   const revIdx = headers.findIndex(h => {
-    const hh = h.trim()
-    return hh === 'revenue' || hh === 'sales' || hh === 'amount' || hh === 'value'
+      const hh = h.trim()
+      return hh === 'revenue' || hh === 'revenue_nzd' || hh === 'sales' || hh === 'amount' || hh === 'value'
   })
-
   if (dateIdx === -1 || revIdx === -1) return []
 
   const points = []
@@ -141,31 +163,125 @@ async function getSavedForecast(req, res) {
 }
 
 async function runForecast(req, res) {
-  const snapshot = ensureSnapshot()
-
-  if (!snapshot) {
+  if (!latestDataPoints.length) {
     return res.status(404).json({ message: 'Upload a CSV file before running a forecast.' })
   }
 
-  res.json({
-    forecast: snapshot.forecast,
-    fileName: snapshot.fileName,
-    uploadedAt: snapshot.uploadedAt,
-  })
+  // Apply optional date-range filter
+  let dataPoints = latestDataPoints
+  const { startDate, endDate } = req.body || {}
+  if (startDate || endDate) {
+    dataPoints = latestDataPoints.filter((pt) => {
+      if (startDate && pt.date < startDate) return false
+      if (endDate && pt.date > endDate) return false
+      return true
+    })
+  }
+
+  if (dataPoints.length < 10) {
+    return res.status(400).json({
+      error: 'Insufficient data points in the selected date range. At least 10 are required.',
+      found: dataPoints.length,
+    })
+  }
+
+  try {
+    const forecastResult = await callForecastService(dataPoints)
+
+    latestAnalyticsSnapshot = {
+      ...(latestAnalyticsSnapshot || {}),
+      forecast: forecastResult,
+      fileName: latestUpload?.fileName || latestAnalyticsSnapshot?.fileName || null,
+      uploadedAt: latestUpload?.uploadedAt || latestAnalyticsSnapshot?.uploadedAt || null,
+    }
+
+    res.json(latestAnalyticsSnapshot)
+  } catch (error) {
+    console.error('runForecast error:', error.message)
+    res.status(502).json({
+      message: 'Forecast service failed.',
+      error: error.message,
+      forecast: latestAnalyticsSnapshot?.forecast || [],
+      fileName: latestUpload?.fileName || null,
+      uploadedAt: latestUpload?.uploadedAt || null,
+    })
+  }
 }
 
 async function getAnomalies(req, res) {
-  const snapshot = ensureSnapshot()
-
-  if (!snapshot) {
+  if (!latestDataPoints.length) {
     return res.status(404).json({ message: 'Upload a CSV file before checking anomalies.' })
   }
 
-  res.json({
-    anomalies: snapshot.anomalies,
-    fileName: snapshot.fileName,
-    uploadedAt: snapshot.uploadedAt,
-  })
+  // Apply optional date-range filter from query params
+  let dataPoints = latestDataPoints
+  const { startDate, endDate } = req.query || {}
+  if (startDate || endDate) {
+    dataPoints = latestDataPoints.filter((pt) => {
+      if (startDate && pt.date < startDate) return false
+      if (endDate && pt.date > endDate) return false
+      return true
+    })
+  }
+
+  if (dataPoints.length < 10) {
+    return res.status(400).json({
+      error: 'Insufficient data points in the selected date range. At least 10 are required.',
+      found: dataPoints.length,
+    })
+  }
+
+  try {
+    const anomalyResult = await callAnomalyService(dataPoints)
+    const holidayMap = getHolidayMap(latestCsvContent)
+
+    anomalyResult.anomalies = anomalyResult.anomalies.map((a) => ({
+      ...a,
+      holiday_name: holidayMap[a.date] || null,
+    }))
+    
+    latestAnalyticsSnapshot = {
+      ...(latestAnalyticsSnapshot || {}),
+      anomalies: anomalyResult,
+      fileName: latestUpload?.fileName || latestAnalyticsSnapshot?.fileName || null,
+      uploadedAt: latestUpload?.uploadedAt || latestAnalyticsSnapshot?.uploadedAt || null,
+    }
+
+    res.json({
+      anomalies: anomalyResult,
+      fileName: latestUpload?.fileName || null,
+      uploadedAt: latestUpload?.uploadedAt || null,
+    })
+  } catch (error) {
+    console.error('getAnomalies error:', error.message)
+    res.status(502).json({
+      message: 'Anomaly detection service failed.',
+      error: error.message,
+      anomalies: latestAnalyticsSnapshot?.anomalies || { anomalies: [], summary: '', anomalies_found: 0 },
+      fileName: latestUpload?.fileName || null,
+      uploadedAt: latestUpload?.uploadedAt || null,
+    })
+  }
+}
+
+// -- REVENUE TREND (real historical data, filtered by date range) -- //
+async function getRevenueTrend(req, res) {
+  if (!latestDataPoints.length) {
+    return res.status(404).json({ message: 'Upload a CSV file to see the revenue trend.' })
+  }
+
+  let points = latestDataPoints
+  const { startDate, endDate } = req.query || {}
+
+  if (startDate || endDate) {
+    points = latestDataPoints.filter((pt) => {
+      if (startDate && pt.date < startDate) return false
+      if (endDate && pt.date > endDate) return false
+      return true
+    })
+  }
+
+  res.json({ points })
 }
 
 // -- CSV UPLOAD -- //
@@ -185,6 +301,7 @@ async function uploadCsv(req, res) {
 
   // Parses CSV to data points for the AI service //
   const dataPoints = parseCsvToDataPoints(csvContent)
+  latestDataPoints = dataPoints
 
   if (dataPoints.length < 10) {
     return res.status(400).json({
@@ -252,5 +369,7 @@ module.exports = {
   runForecast,
   getAnomalies,
   uploadCsv,
+  getRevenueTrend,
   getLatestCsvContent,
+  getLatestDataPoints,
 }

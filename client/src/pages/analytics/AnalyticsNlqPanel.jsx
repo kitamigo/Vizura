@@ -126,30 +126,29 @@ export function AnalyticsNlqPanel({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-sky-100 bg-white dark:divide-white/10 dark:bg-slate-950/40">
-                {queryResult.rows.length ? queryResult.rows.map((row, rowIdx) => (
-                  <tr key={rowIdx}>
-                    {queryColumns.map((col) => (
-                      <td key={col} className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                        {String(row?.[col] ?? '')}
-                      </td>
-                    ))}
-                  </tr>
-                )) : (
-                  <tr>
-                    <td className="px-4 py-4 text-slate-500 dark:text-slate-300" colSpan={Math.max(queryColumns.length, 1)}>
-                      No results found for that question.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
             </table>
+            <div className="max-h-[320px] overflow-y-auto">
+              <table className="w-full text-left text-sm">
+                <tbody className="divide-y divide-sky-100 bg-white dark:divide-white/10 dark:bg-slate-950/40">
+                  {queryResult.rows.length ? queryResult.rows.map((row, rowIdx) => (
+                    <tr key={rowIdx}>
+                      {queryColumns.map((col) => (
+                        <td key={col} className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                          {String(row?.[col] ?? '')}
+                        </td>
+                      ))}
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td className="px-4 py-4 text-slate-500 dark:text-slate-300" colSpan={Math.max(queryColumns.length, 1)}>
+                        No results found for that question.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-
-          <details className="mt-4 rounded-2xl border border-sky-100 bg-white px-4 py-3 dark:border-white/10 dark:bg-slate-950/40">
-            <summary className="cursor-pointer text-sm font-semibold text-sky-800 dark:text-sky-100">View SQL</summary>
-            <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{queryResult.sql || 'No SQL returned yet.'}</pre>
-          </details>
         </section>
       ) : null}
     </>

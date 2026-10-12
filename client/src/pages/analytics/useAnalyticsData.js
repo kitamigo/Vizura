@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   fetchAnomalies,
   fetchNlqHistory,
+  fetchRevenueTrend,
   fetchSavedForecast,
   runForecast,
   runNlqQuery,
@@ -38,6 +39,7 @@ function normalizeAnomalyItems(anomalies) {
     expected_value: a.expected_value,
     deviation_pct: a.deviation_pct,
     explanation: a.explanation,
+    holiday_name: a.holiday_name || null,
   }))
 }
 
@@ -47,7 +49,7 @@ function normalizeAnalyticsPayload(payload) {
     : zipForecastPoints(payload?.forecast)
 
   const anomalies = payload?.anomalies?.anomalies
-    ? normalizeAnomalyItems(payload)
+    ? normalizeAnomalyItems(payload.anomalies)
     : Array.isArray(payload?.anomalies)
       ? normalizeAnomalyItems({ anomalies: payload.anomalies })
       : []
@@ -84,6 +86,7 @@ export function useAnalyticsData(dateRange) {
   const [queryHistory, setQueryHistory] = useState([])
   const [statusMsg, setStatusMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  const [revenueTrendPts, setRevenueTrendPts] = useState([])
 
   const forecastPts = forecastData.forecast || []
   const hasData = forecastPts.length > 0 || anomalies.length > 0
@@ -146,6 +149,29 @@ export function useAnalyticsData(dateRange) {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadRevenueTrend() {
+      try {
+        const res = await fetchRevenueTrend(getDateRangePayload(dateRange))
+        if (!cancelled) {
+          setRevenueTrendPts(res?.points || [])
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRevenueTrendPts([])
+        }
+      }
+    }
+
+    loadRevenueTrend()
+
+    return () => {
+      cancelled = true
+    }
+  }, [dateRange])
 
   const runSavedForecast = async () => {
     if (!hasData) {
@@ -214,6 +240,14 @@ export function useAnalyticsData(dateRange) {
       setAnomalies(norm.anomalies)
       setStatusMsg(res.message || 'CSV uploaded successfully. Model output received.')
       setCsvFile(null)
+
+      // Refresh the revenue trend now that new data exists
+      try {
+        const trendRes = await fetchRevenueTrend(getDateRangePayload(dateRange))
+        setRevenueTrendPts(trendRes?.points || [])
+      } catch (trendErr) {
+        // trend refresh failing shouldn't block the upload success state
+      }
     } catch (error) {
       setErrorMsg('Upload failed or the model endpoint did not return analytics data.')
     } finally {
@@ -298,5 +332,6 @@ export function useAnalyticsData(dateRange) {
     submitQuery,
     loadHistoryQuery,
     uploadCsv,
+    revenueTrendPts,
   }
 }

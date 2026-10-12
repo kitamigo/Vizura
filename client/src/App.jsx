@@ -5,6 +5,7 @@ import Header from './components/layout/Header.jsx'
 import Dashboard from './pages/dashboard/Dashboard.jsx'
 import Payroll from './pages/payroll/Payroll.jsx'
 import Analytics from './pages/analytics/Analytics.jsx'
+import Roster from './pages/rostering/Rostering.jsx'
 
 import Login from './pages/auth/Login.jsx'
 import Register from './pages/auth/Register.jsx'
@@ -50,6 +51,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Payroll />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="roster"
+            element={
+              <ProtectedRoute>
+                <Roster />
               </ProtectedRoute>
             }
           />
