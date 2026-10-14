@@ -77,7 +77,7 @@ const toPayload = (e, rosterId) => ({
 const hoursBetween = (a, b) => (b - a) / 36e5;
 
 /* ------------------------------ page ------------------------------- */
-export default function RosterPage() {
+export default function Rostering() {
   const scheduler = useRef(null);
   const [employees, setEmployees] = useState([]);
   const [shifts, setShifts] = useState([]);
@@ -211,68 +211,75 @@ export default function RosterPage() {
   const hasDrafts = shifts.some((s) => !s.IsPublished);
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Roster</h1>
-        <button
-          onClick={publishWeek}
-          disabled={busy || !hasDrafts}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-        >
-          Publish roster
-        </button>
-      </div>
-
-      {error && (
-        <div role="alert" className="mb-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">
-          {error}
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Rostering</h1>
+            <p className="mt-1 text-sm text-gray-500">Plan and publish employee shifts.</p>
+          </div>
+          <button
+            onClick={publishWeek}
+            disabled={busy || !hasDrafts}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Publish roster
+          </button>
         </div>
-      )}
 
-      <ScheduleComponent
-        ref={scheduler}
-        height="600px"
-        width="100%"
-        currentView="TimelineWeek"
-        selectedDate={range.start}
-        firstDayOfWeek={1}
-        startHour="06:00"
-        endHour="24:00"
-        showQuickInfo={false}
-        rowAutoHeight
-        group={{ resources: ['Employees'] }}
-        eventSettings={{
-          dataSource: shifts,
-          template: eventTemplate,
-          fields: {
-            id: 'Id',
-            subject: { name: 'Subject', default: 'Shift' },
-            startTime: { name: 'StartTime' },
-            endTime: { name: 'EndTime' },
-          },
-        }}
-        resourceHeaderTemplate={resourceHeaderTemplate}
-        eventRendered={onEventRendered}
-        actionComplete={onActionComplete}
-      >
-        <ResourcesDirective>
-          <ResourceDirective
-            field="EmployeeId"
-            title="Employee"
-            name="Employees"
-            dataSource={employees}
-            textField="name"
-            idField="id"
-            colorField="color"
-          />
-        </ResourcesDirective>
-        <ViewsDirective>
-          <ViewDirective option="TimelineWeek" />
-          <ViewDirective option="TimelineMonth" />
-          <ViewDirective option="Week" />
-        </ViewsDirective>
-        <Inject services={[TimelineViews, TimelineMonth, Week, DragAndDrop, Resize]} />
-      </ScheduleComponent>
+        {error && (
+          <div role="alert" className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <ScheduleComponent
+            ref={scheduler}
+            height="600px"
+            width="100%"
+            currentView="TimelineWeek"
+            selectedDate={range.start}
+            firstDayOfWeek={1}
+            startHour="06:00"
+            endHour="24:00"
+            showQuickInfo={false}
+            rowAutoHeight
+            group={{ resources: ['Employees'] }}
+            eventSettings={{
+              dataSource: shifts,
+              template: eventTemplate,
+              fields: {
+                id: 'Id',
+                subject: { name: 'Subject', default: 'Shift' },
+                startTime: { name: 'StartTime' },
+                endTime: { name: 'EndTime' },
+              },
+            }}
+            resourceHeaderTemplate={resourceHeaderTemplate}
+            eventRendered={onEventRendered}
+            actionComplete={onActionComplete}
+          >
+            <ResourcesDirective>
+              <ResourceDirective
+                field="EmployeeId"
+                title="Employee"
+                name="Employees"
+                dataSource={employees}
+                textField="name"
+                idField="id"
+                colorField="color"
+              />
+            </ResourcesDirective>
+            <ViewsDirective>
+              <ViewDirective option="TimelineWeek" />
+              <ViewDirective option="TimelineMonth" />
+              <ViewDirective option="Week" />
+            </ViewsDirective>
+            <Inject services={[TimelineViews, TimelineMonth, Week, DragAndDrop, Resize]} />
+          </ScheduleComponent>
+        </div>
+      </div>
     </div>
   );
 }
