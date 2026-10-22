@@ -111,7 +111,7 @@ export function useAnalyticsData(dateRange) {
         const norm = normalizeAnalyticsPayload(res)
         setForecastData((cur) => ({ ...cur, ...norm }))
         setAnomalies(norm.anomalies)
-      } catch (error) {
+      } catch {
         if (!cancelled) {
           setForecastData({ forecast: [], anomalies: [] })
           setAnomalies([])
@@ -136,7 +136,7 @@ export function useAnalyticsData(dateRange) {
         if (cancelled) return
 
         setQueryHistory(Array.isArray(res?.history) ? res.history : [])
-      } catch (error) {
+      } catch {
         if (!cancelled) {
           setQueryHistory([])
         }
@@ -159,7 +159,7 @@ export function useAnalyticsData(dateRange) {
         if (!cancelled) {
           setRevenueTrendPts(res?.points || [])
         }
-      } catch (error) {
+      } catch {
         if (!cancelled) {
           setRevenueTrendPts([])
         }
@@ -189,7 +189,7 @@ export function useAnalyticsData(dateRange) {
       setForecastData((cur) => ({ ...cur, ...norm }))
       setAnomalies(norm.anomalies.length ? norm.anomalies : anomalies)
       setStatusMsg('Forecast updated from the model output.')
-    } catch (error) {
+    } catch {
       setErrorMsg('Forecast endpoint is not ready yet or returned no data.')
     } finally {
       setLoadingForecast(false)
@@ -214,7 +214,7 @@ export function useAnalyticsData(dateRange) {
         setForecastData((cur) => ({ ...cur, ...norm }))
       }
       setStatusMsg('Anomalies refreshed from the model output.')
-    } catch (error) {
+    } catch {
       setErrorMsg('Anomaly endpoint is not ready yet or returned no data.')
     } finally {
       setLoadingAnomalies(false)
@@ -245,10 +245,10 @@ export function useAnalyticsData(dateRange) {
       try {
         const trendRes = await fetchRevenueTrend(getDateRangePayload(dateRange))
         setRevenueTrendPts(trendRes?.points || [])
-      } catch (trendErr) {
+      } catch {
         // trend refresh failing shouldn't block the upload success state
       }
-    } catch (error) {
+    } catch {
       setErrorMsg('Upload failed or the model endpoint did not return analytics data.')
     } finally {
       setLoadingUpload(false)
@@ -288,7 +288,7 @@ export function useAnalyticsData(dateRange) {
       })
 
       setStatusMsg('Query executed.')
-    } catch (error) {
+    } catch {
       setErrorMsg('NLQ endpoint is not ready yet or returned an error.')
       setQueryResult({
         question: q,

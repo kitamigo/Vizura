@@ -1,11 +1,5 @@
 import { useState } from 'react'
-
-export function formatDDMMYY(dateStr) {
-  if (!dateStr) return ''
-  const [year, month, day] = dateStr.split('-')
-  if (!year || !month || !day) return dateStr
-  return `${day}/${month}/${year.slice(2)}`
-}
+import { formatDDMMYY } from './analyticsUtils'
 
 export function ForecastTrendChart({ data }) {
   const [selected, setSelected] = useState(null)

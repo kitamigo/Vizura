@@ -1,0 +1,7 @@
+.roster-position {
+    position: absolute;
+    top: calc(4rem + ((100vh - rem - 77vh) / 2));
+    right: 10;
+    height: 80vh;
+    width: calc(80vw - 250px);
+}

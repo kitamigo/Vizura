@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 
 function Sidebar() {
 
@@ -64,6 +64,13 @@ function Sidebar() {
               className={navLinkClass}
             >
               Payroll
+            </NavLink>
+
+            <NavLink
+              to="/app/roster"
+              className={navLinkClass}
+            >
+              Roster
             </NavLink>
 
           </div>

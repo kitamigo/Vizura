@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import DatePicker from '../../components/ui/DateRangePicker'
 import { Button } from 'flowbite-react'
 import { AnalyticsNlqPanel } from './AnalyticsNlqPanel'
-import { ForecastBandChart, ForecastTrendChart, formatDDMMYY } from './AnalyticsCharts'
+import { ForecastBandChart, ForecastTrendChart } from './AnalyticsCharts'
+import { formatDDMMYY } from './analyticsUtils'
 import { useAnalyticsData } from './useAnalyticsData'
 
 const analyticsButtonClass = 'cursor-pointer rounded-2xl border border-transparent bg-sky-500 px-4 py-2 text-white shadow-sm transition hover:bg-sky-400 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:translate-y-px active:shadow-[inset_0_2px_10px_rgba(15,23,42,0.22)] disabled:cursor-not-allowed'
@@ -22,7 +23,6 @@ function AnalyticsShell({ dateRange, setDateRange }) {
   const {
     anomalies,
     csvFile,
-    errorMsg,
     forecastPts,
     hasData,
     loadingAnomalies,
@@ -38,7 +38,6 @@ function AnalyticsShell({ dateRange, setDateRange }) {
     runSavedForecast,
     setCsvFile,
     setQueryText,
-    statusMsg,
     submitQuery,
     loadHistoryQuery,
     uploadCsv,

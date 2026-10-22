@@ -5,7 +5,7 @@ import Header from './components/layout/Header.jsx'
 import Dashboard from './pages/dashboard/Dashboard.jsx'
 import Payroll from './pages/payroll/Payroll.jsx'
 import Analytics from './pages/analytics/Analytics.jsx'
-import Roster from './pages/rostering/Rostering.jsx'
+import Roster from './pages/roster/Roster.jsx'
 
 import Login from './pages/auth/Login.jsx'
 import Register from './pages/auth/Register.jsx'
@@ -22,8 +22,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Redirect root to login */}
-        <Route path="/" element={<Navigate to="/login" />} />
+        {/* Opens the roster before authentication for editing - TEMPORARY */}
+        <Route path="/" element={<Navigate to="/app/roster" replace />} />
 
         {/* App shell */}
         <Route path="/app" element={<MainLayout />}>
@@ -57,11 +57,7 @@ function App() {
 
           <Route
             path="roster"
-            element={
-              <ProtectedRoute>
-                <Roster />
-              </ProtectedRoute>
-            }
+            element={<Roster />}
           />
 
         </Route>

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import RegisterForm from '../../components/auth/RegisterForm'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 
 function Register() {
 

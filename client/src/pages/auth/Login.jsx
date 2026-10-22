@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import LoginForm from '../../components/auth/LoginForm'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 
 function Login() {
 
@@ -12,7 +12,7 @@ function Login() {
 
     try {
 
-      const data = await login(email, password)
+      await login(email, password)
       
     
         navigate('/app/dashboard')
