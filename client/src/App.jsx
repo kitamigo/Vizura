@@ -22,7 +22,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
+<<<<<<< Updated upstream
         {/* Opens the roster before authentication for editing - TEMPORARY */}
+=======
+        {/* Open the roster before authentication */}
+>>>>>>> Stashed changes
         <Route path="/" element={<Navigate to="/app/roster" replace />} />
 
         {/* App shell */}
