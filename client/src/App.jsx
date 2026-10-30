@@ -6,6 +6,8 @@ import Dashboard from './pages/dashboard/Dashboard.jsx'
 import Payroll from './pages/payroll/Payroll.jsx'
 import Analytics from './pages/analytics/Analytics.jsx'
 import Roster from './pages/roster/Roster.jsx'
+import EmployeeManagement from './pages/employees/EmployeeManagement.jsx'
+import Settings from './pages/settings/Settings.jsx'
 
 import Login from './pages/auth/Login.jsx'
 import Register from './pages/auth/Register.jsx'
@@ -58,6 +60,24 @@ function App() {
           <Route
             path="roster"
             element={<Roster />}
+          />
+
+          <Route
+            path="employees"
+            element={
+              <ProtectedRoute>
+                <EmployeeManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
           />
 
         </Route>

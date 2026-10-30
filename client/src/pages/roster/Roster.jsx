@@ -1,5 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import axios from 'axios';
+import { useMemo, useRef, useState } from 'react';
 import {
   ScheduleComponent,
   ViewsDirective,
@@ -14,36 +13,7 @@ import {
   Resize,
 } from '@syncfusion/ej2-react-schedule';
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? '/api' });
-api.interceptors.request.use((cfg) => {
-  const token = localStorage.getItem('token');
-  if (token) cfg.headers.Authorization = `Bearer ${token}`;
-  return cfg;
-});
-
-const rosterApi = {
-  // employees for the business, each with { employee_id, first_name, last_name, role, hourly_rate }
-  employees: () => api.get('/roster/employees').then((r) => r.data),
-
-  // shifts overlapping the visible range
-  shifts: (from, to) =>
-    api.get('/roster/shifts', { params: { from, to } }).then((r) => r.data),
-
-
-  ensureRoster: (weekStart) =>
-    api.post('/roster/ensure', { week_start: weekStart }).then((r) => r.data), // -> { roster_id }
-
-  createShift: (body) => api.post('/roster/shifts', body).then((r) => r.data),
-  updateShift: (id, body) => api.put(`/roster/shifts/${id}`, body).then((r) => r.data),
-  deleteShift: (id) => api.delete(`/roster/shifts/${id}`),
-  publish: (rosterId) => api.post(`/roster/${rosterId}/publish`),
-};
-
 /* ----------------------------- helpers ----------------------------- */
-const pad = (n) => String(n).padStart(2, '0');
-const toDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const toTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-
 const mondayOf = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -51,77 +21,41 @@ const mondayOf = (d) => {
   return x;
 };
 
-// DB row -> Scheduler event
-const toEvent = (s) => {
-  const day = String(s.date).slice(0, 10);
-  return {
-    Id: s.shift_id,
-    Subject: 'Shift',
-    StartTime: new Date(`${day}T${s.start_time}`),
-    EndTime: new Date(`${day}T${s.end_time}`),
-    EmployeeId: s.employee_id,
-    RosterId: s.roster_id,
-    IsPublished: s.is_published,
-  };
-};
-
-// Scheduler event -> DB payload
-const toPayload = (e, rosterId) => ({
-  employee_id: e.EmployeeId,
-  roster_id: rosterId ?? e.RosterId,
-  date: toDate(e.StartTime),
-  start_time: toTime(e.StartTime),
-  end_time: toTime(e.EndTime),
-});
-
 const hoursBetween = (a, b) => (b - a) / 36e5;
 const shiftDurationMs = 60 * 60 * 1000;
+const testEmployee = {
+  id: 1,
+  name: 'Alex Morgan',
+  role: 'Test employee',
+  color: '#2563eb',
+};
 
 /* ------------------------------ page ------------------------------- */
 export default function Rostering() {
   const scheduler = useRef(null);
-  const [employees, setEmployees] = useState([]);
-  const [shifts, setShifts] = useState([]);
+  const [employees] = useState([testEmployee]);
   const [range, setRange] = useState(() => {
     const start = mondayOf(new Date());
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
     return { start, end };
   });
+  const [shifts, setShifts] = useState(() => {
+    const start = mondayOf(new Date());
+    const shiftStart = new Date(start);
+    shiftStart.setHours(9, 0, 0, 0);
+    return [{
+      Id: 1,
+      Subject: 'Test shift',
+      StartTime: shiftStart,
+      EndTime: new Date(shiftStart.getTime() + 8 * shiftDurationMs),
+      EmployeeId: testEmployee.id,
+      RosterId: 1,
+      IsPublished: false,
+    }];
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-
-  const loadShifts = useCallback(async (start, end) => {
-    try {
-      const rows = await rosterApi.shifts(toDate(start), toDate(end));
-      setShifts(rows.map(toEvent));
-    } catch {
-      setError('Could not load shifts. Check your connection and try again.');
-    }
-  }, []);
-
-  useEffect(() => {
-    rosterApi
-      .employees()
-      .then((rows) =>
-        setEmployees(
-          rows.map((e) => ({
-            id: e.employee_id,
-            name: `${e.first_name} ${e.last_name}`,
-            role: e.role,
-            color: '#2563eb',
-          }))
-        )
-      )
-      .catch(() => setError('Could not load employees.'));
-  }, []);
-
-  useEffect(() => {
-    const refresh = setTimeout(() => {
-      void loadShifts(range.start, range.end);
-    }, 0);
-    return () => clearTimeout(refresh);
-  }, [range, loadShifts]);
 
   /* weekly hours per employee, shown in the row header */
   const hoursByEmployee = useMemo(() => {
@@ -132,8 +66,8 @@ export default function Rostering() {
     return totals;
   }, [shifts]);
 
-  /* persist add / drag / resize / delete, then reload so the UI matches the DB */
-  const onActionComplete = async (args) => {
+  /* Demo mode keeps roster edits local until the real roster service is connected. */
+  const onActionComplete = (args) => {
     const { requestType } = args;
 
     if (requestType === 'dateNavigate' || requestType === 'viewNavigate') {
@@ -144,45 +78,25 @@ export default function Rostering() {
 
     if (!['eventCreated', 'eventChanged', 'eventRemoved'].includes(requestType)) return;
 
-    setBusy(true);
     setError('');
-    try {
-      if (requestType === 'eventCreated') {
-        for (const e of args.addedRecords) {
-          const { roster_id } = await rosterApi.ensureRoster(toDate(mondayOf(e.StartTime)));
-          await rosterApi.createShift(toPayload(e, roster_id));
-        }
-      }
-      if (requestType === 'eventChanged') {
-        for (const e of args.changedRecords) {
-          await rosterApi.updateShift(e.Id, toPayload(e));
-        }
-      }
-      if (requestType === 'eventRemoved') {
-        for (const e of args.deletedRecords) await rosterApi.deleteShift(e.Id);
-      }
-    } catch (err) {
-      // conflictDetector responses (double booking, overlap, leave) surface here
-      const msg = err.response?.data?.error ?? err.response?.data?.message;
-      setError(msg ?? 'That change could not be saved.');
-    } finally {
-      await loadShifts(range.start, range.end); // reverts the UI if the save failed
-      setBusy(false);
+    if (requestType === 'eventCreated') {
+      setShifts((current) => [...current, ...args.addedRecords]);
+    }
+    if (requestType === 'eventChanged') {
+      setShifts((current) => current.map((shift) => (
+        args.changedRecords.find((changed) => changed.Id === shift.Id) || shift
+      )));
+    }
+    if (requestType === 'eventRemoved') {
+      const removedIds = new Set(args.deletedRecords.map((event) => event.Id));
+      setShifts((current) => current.filter((shift) => !removedIds.has(shift.Id)));
     }
   };
 
   const publishWeek = async () => {
-    const rosterIds = [...new Set(shifts.map((s) => s.RosterId))];
-    if (!rosterIds.length) return;
     setBusy(true);
-    try {
-      await Promise.all(rosterIds.map(rosterApi.publish));
-      await loadShifts(range.start, range.end);
-    } catch {
-      setError('Could not publish this roster.');
-    } finally {
-      setBusy(false);
-    }
+    setShifts((current) => current.map((shift) => ({ ...shift, IsPublished: true })));
+    setBusy(false);
   };
 
   const onCalendarDrop = async (event) => {
@@ -202,22 +116,16 @@ export default function Rostering() {
     setBusy(true);
     setError('');
 
-    try {
-      const { roster_id } = await rosterApi.ensureRoster(toDate(mondayOf(startTime)));
-      await rosterApi.createShift({
-        employee_id: employeeId,
-        roster_id,
-        date: toDate(startTime),
-        start_time: toTime(startTime),
-        end_time: toTime(endTime),
-      });
-      await loadShifts(range.start, range.end);
-    } catch (err) {
-      const message = err.response?.data?.error ?? err.response?.data?.message;
-      setError(message ?? 'That shift could not be created.');
-    } finally {
-      setBusy(false);
-    }
+    setShifts((current) => [...current, {
+      Id: Date.now(),
+      Subject: 'Test shift',
+      StartTime: startTime,
+      EndTime: endTime,
+      EmployeeId: employeeId,
+      RosterId: 1,
+      IsPublished: false,
+    }]);
+    setBusy(false);
   };
 
   const onEmployeeDragStart = (event, employeeId) => {

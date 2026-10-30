@@ -73,8 +73,29 @@ function Sidebar() {
               Roster
             </NavLink>
 
+            <NavLink
+              to="/app/employees"
+              className={navLinkClass}
+            >
+              Employee management
+            </NavLink>
+
           </div>
 
+        </div>
+
+        <div className="mb-8">
+          <h2 className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+            Fixins
+          </h2>
+          <div className="space-y-1">
+            <NavLink
+              to="/app/settings"
+              className={navLinkClass}
+            >
+              Settings
+            </NavLink>
+          </div>
         </div>
 
 
