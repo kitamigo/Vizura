@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ScheduleComponent,
   ViewsDirective,
@@ -23,12 +23,11 @@ const mondayOf = (d) => {
 
 const hoursBetween = (a, b) => (b - a) / 36e5;
 const shiftDurationMs = 60 * 60 * 1000;
-const testEmployee = {
-  id: 1,
-  name: 'Alex Morgan',
-  role: 'Test employee',
-  color: '#2563eb',
-};
+import {
+  readDemoShifts,
+  testEmployee,
+  writeDemoShifts,
+} from '../../services/demoRoster';
 
 /* ------------------------------ page ------------------------------- */
 export default function Rostering() {
@@ -40,22 +39,21 @@ export default function Rostering() {
     end.setDate(end.getDate() + 6);
     return { start, end };
   });
-  const [shifts, setShifts] = useState(() => {
-    const start = mondayOf(new Date());
-    const shiftStart = new Date(start);
-    shiftStart.setHours(9, 0, 0, 0);
-    return [{
-      Id: 1,
-      Subject: 'Test shift',
-      StartTime: shiftStart,
-      EndTime: new Date(shiftStart.getTime() + 8 * shiftDurationMs),
-      EmployeeId: testEmployee.id,
-      RosterId: 1,
-      IsPublished: false,
-    }];
-  });
+  const [shifts, setShifts] = useState(readDemoShifts);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    writeDemoShifts(shifts);
+  }, [shifts]);
+
+  useEffect(() => {
+    const refreshShifts = () => setShifts(readDemoShifts());
+    window.addEventListener('storage', refreshShifts);
+    return () => {
+      window.removeEventListener('storage', refreshShifts);
+    };
+  }, []);
 
   /* weekly hours per employee, shown in the row header */
   const hoursByEmployee = useMemo(() => {
