@@ -1,37 +1,4 @@
-<<<<<<< Updated upstream
-import { ScheduleComponent, Day, Week, Month, Agenda, Inject } from '@syncfusion/ej2-react-schedule';
-import './Roster.css';
-
-
-function Roster () {
-  const data = [ // Filler meeting for example
-    {
-      Id: 1,
-      Subject: 'Meeting - 1',
-      StartTime: new Date(new Date().setHours(9,0,0)),
-      EndTime: new Date(new Date().setHours(10,0,0)),
-    }
-  ];
-
-  const eventSettings = { dataSource: data };
-
-  return (
-    <ScheduleComponent
-      cssClass="roster-position"
-      width="calc(80vw - 250px)"
-      height="75vh"
-      currentView="Week"
-      views={['Day', 'Week', 'Month', 'Agenda']}
-      eventSettings={eventSettings}
-    >
-      <Inject services={[Day, Week, Month, Agenda]} />
-    </ScheduleComponent>
-  );
-};
-
-export default Roster;
-=======
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import {
   ScheduleComponent,
@@ -108,6 +75,7 @@ const toPayload = (e, rosterId) => ({
 });
 
 const hoursBetween = (a, b) => (b - a) / 36e5;
+const shiftDurationMs = 60 * 60 * 1000;
 
 /* ------------------------------ page ------------------------------- */
 export default function Rostering() {
@@ -149,7 +117,10 @@ export default function Rostering() {
   }, []);
 
   useEffect(() => {
-    loadShifts(range.start, range.end);
+    const refresh = setTimeout(() => {
+      void loadShifts(range.start, range.end);
+    }, 0);
+    return () => clearTimeout(refresh);
   }, [range, loadShifts]);
 
   /* weekly hours per employee, shown in the row header */
@@ -214,6 +185,46 @@ export default function Rostering() {
     }
   };
 
+  const onCalendarDrop = async (event) => {
+    event.preventDefault();
+
+    const employeeId = Number(event.dataTransfer.getData('application/vizura-employee'));
+    if (!employeeId || !scheduler.current) return;
+
+    const cellDetails = scheduler.current.getCellDetails(event.target);
+    if (!cellDetails?.startTime) {
+      setError('Drop the employee onto an available calendar time.');
+      return;
+    }
+
+    const startTime = new Date(cellDetails.startTime);
+    const endTime = new Date(startTime.getTime() + shiftDurationMs);
+    setBusy(true);
+    setError('');
+
+    try {
+      const { roster_id } = await rosterApi.ensureRoster(toDate(mondayOf(startTime)));
+      await rosterApi.createShift({
+        employee_id: employeeId,
+        roster_id,
+        date: toDate(startTime),
+        start_time: toTime(startTime),
+        end_time: toTime(endTime),
+      });
+      await loadShifts(range.start, range.end);
+    } catch (err) {
+      const message = err.response?.data?.error ?? err.response?.data?.message;
+      setError(message ?? 'That shift could not be created.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onEmployeeDragStart = (event, employeeId) => {
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/vizura-employee', String(employeeId));
+  };
+
   const onEventRendered = (args) => {
     const published = args.data.IsPublished;
     args.element.style.backgroundColor = published ? '#2563eb' : '#dbeafe';
@@ -228,7 +239,7 @@ export default function Rostering() {
       <div className="flex flex-col leading-tight">
         <span className="font-medium">{emp?.name}</span>
         <span className="text-xs text-gray-500">
-          {emp?.role} · {hrs.toFixed(1)}h
+          {emp?.role} Â· {hrs.toFixed(1)}h
         </span>
       </div>
     );
@@ -236,7 +247,7 @@ export default function Rostering() {
 
   const eventTemplate = (props) => (
     <div className="px-1 text-xs">
-      {props.StartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} –{' '}
+      {props.StartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} â€“{' '}
       {props.EndTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
     </div>
   );
@@ -244,12 +255,14 @@ export default function Rostering() {
   const hasDrafts = shifts.some((s) => !s.IsPublished);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-transparent p-6">
+      <div className="mx-auto max-w-[1600px]">
+        <section className="mb-6 flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 py-5 shadow-none backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Rostering</h1>
-            <p className="mt-1 text-sm text-gray-500">Plan and publish employee shifts.</p>
+            <h1 className="text-3xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
+              Rostering
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">Plan and publish employee shifts.</p>
           </div>
           <button
             onClick={publishWeek}
@@ -258,7 +271,7 @@ export default function Rostering() {
           >
             Publish roster
           </button>
-        </div>
+        </section>
 
         {error && (
           <div role="alert" className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -266,54 +279,85 @@ export default function Rostering() {
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <ScheduleComponent
-            ref={scheduler}
-            height="600px"
-            width="100%"
-            currentView="TimelineWeek"
-            selectedDate={range.start}
-            firstDayOfWeek={1}
-            startHour="06:00"
-            endHour="24:00"
-            showQuickInfo={false}
-            rowAutoHeight
-            group={{ resources: ['Employees'] }}
-            eventSettings={{
-              dataSource: shifts,
-              template: eventTemplate,
-              fields: {
-                id: 'Id',
-                subject: { name: 'Subject', default: 'Shift' },
-                startTime: { name: 'StartTime' },
-                endTime: { name: 'EndTime' },
-              },
-            }}
-            resourceHeaderTemplate={resourceHeaderTemplate}
-            eventRendered={onEventRendered}
-            actionComplete={onActionComplete}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div
+            className="overflow-hidden rounded-xl border border-sky-200/80 bg-white/80 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={onCalendarDrop}
           >
-            <ResourcesDirective>
-              <ResourceDirective
-                field="EmployeeId"
-                title="Employee"
-                name="Employees"
-                dataSource={employees}
-                textField="name"
-                idField="id"
-                colorField="color"
-              />
-            </ResourcesDirective>
-            <ViewsDirective>
-              <ViewDirective option="TimelineWeek" />
-              <ViewDirective option="TimelineMonth" />
-              <ViewDirective option="Week" />
-            </ViewsDirective>
-            <Inject services={[TimelineViews, TimelineMonth, Week, DragAndDrop, Resize]} />
-          </ScheduleComponent>
+            <ScheduleComponent
+              ref={scheduler}
+              height="600px"
+              width="100%"
+              currentView="TimelineWeek"
+              selectedDate={range.start}
+              firstDayOfWeek={1}
+              startHour="06:00"
+              endHour="24:00"
+              showQuickInfo={false}
+              rowAutoHeight
+              allowDragAndDrop
+              allowResizing
+              group={{ resources: ['Employees'] }}
+              eventSettings={{
+                dataSource: shifts,
+                template: eventTemplate,
+                fields: {
+                  id: 'Id',
+                  subject: { name: 'Subject', default: 'Shift' },
+                  startTime: { name: 'StartTime' },
+                  endTime: { name: 'EndTime' },
+                },
+              }}
+              resourceHeaderTemplate={resourceHeaderTemplate}
+              eventRendered={onEventRendered}
+              actionComplete={onActionComplete}
+            >
+              <ResourcesDirective>
+                <ResourceDirective
+                  field="EmployeeId"
+                  title="Employee"
+                  name="Employees"
+                  dataSource={employees}
+                  textField="name"
+                  idField="id"
+                  colorField="color"
+                />
+              </ResourcesDirective>
+              <ViewsDirective>
+                <ViewDirective option="TimelineWeek" />
+                <ViewDirective option="TimelineMonth" />
+                <ViewDirective option="Week" />
+              </ViewsDirective>
+              <Inject services={[TimelineViews, TimelineMonth, Week, DragAndDrop, Resize]} />
+            </ScheduleComponent>
+          </div>
+
+          <aside className="rounded-xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Employees</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">Drag an employee onto a calendar time.</p>
+            <div className="mt-4 space-y-2">
+              {employees.map((employee) => (
+                <div
+                  key={employee.id}
+                  draggable
+                  onDragStart={(event) => onEmployeeDragStart(event, employee.id)}
+                  className="cursor-grab rounded-lg border border-sky-200/80 bg-sky-50/60 p-3 transition hover:border-sky-400 hover:bg-sky-100 active:cursor-grabbing dark:border-white/15 dark:bg-slate-900/40 dark:hover:border-sky-300/60 dark:hover:bg-slate-900/60"
+                >
+                  <p className="font-medium text-slate-900 dark:text-white">{employee.name}</p>
+                  <p className="text-xs text-slate-600 dark:text-sky-100/70">{employee.role || 'Employee'}</p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-sky-100/70">
+                    {hoursByEmployee[employee.id]?.toFixed(1) ?? '0.0'}h scheduled
+                  </p>
+                </div>
+              ))}
+              {!employees.length && (
+                <p className="text-sm text-gray-500">No employees available.</p>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
     </div>
   );
 }
->>>>>>> Stashed changes

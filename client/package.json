@@ -10,13 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< Updated upstream
-    "@syncfusion/ej2-react-schedule": "^35.1.37",
-    "@syncfusion/ej2-tailwind3-theme": "^35.1.40",
-=======
     "@syncfusion/ej2-react-grids": "^35.1.40",
     "@syncfusion/ej2-react-schedule": "^35.1.37",
->>>>>>> Stashed changes
+    "@syncfusion/ej2-tailwind3-theme": "^35.1.40",
     "axios": "^1.16.1",
     "flowbite": "^4.0.2",
     "flowbite-react": "^0.12.17",
