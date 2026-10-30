@@ -7,10 +7,10 @@ function Payroll() {
         <section className="flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 py-5 backdrop-blur-md dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
             <h1 className="text-3xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
-              Company payroll
+              Payroll
             </h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">
-              Review, generate, and manage employee pay.
+              Review and manage employee pay.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
