@@ -61,9 +61,9 @@ function AnalyticsShell({ dateRange, setDateRange }) {
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pt-2 pb-4 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="relative z-10 space-y-6">
-        <section className="flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 py-5 shadow-none backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <section className="flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 pb-5 pt-0 shadow-none backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
+            <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
               Analytics overview
             </h1>
           </div>

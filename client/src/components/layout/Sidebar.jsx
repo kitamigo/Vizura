@@ -1,140 +1,111 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
 
-function Sidebar() {
+const navGroups = [
+  {
+    title: 'General',
+    items: [{ label: 'Dashboard', to: '/app/dashboard', icon: 'dashboard' }],
+  },
+  {
+    title: 'Modules',
+    items: [
+      { label: 'Analytics', to: '/app/analytics', icon: 'finance_mode' },
+      { label: 'Payroll', to: '/app/payroll', icon: 'finance_chip' },
+      { label: 'Roster', to: '/app/roster', icon: 'calendar_month' },
+      { label: 'Staff Management', to: '/app/employees', icon: 'groups' },
+    ],
+  },
+  {
+    title: 'Fixins',
+    items: [{ label: 'Settings', to: '/app/settings', icon: 'settings' }],
+  },
+]
 
+function Sidebar({ collapsed, onToggle }) {
   const { user } = useAuth()
+  const userName = user?.name || [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'User'
+  const userInitials = userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((namePart) => namePart[0].toUpperCase())
+    .join('')
 
   const navLinkClass = ({ isActive }) =>
-    `block px-4 py-2 rounded-lg transition-colors ${
+    `relative flex items-center rounded-lg py-2 transition-colors ${
+      collapsed ? 'justify-center px-2' : 'gap-[16px] px-4'
+    } ${
       isActive
-        ? 'bg-indigo-600 text-white'
+        ? 'bg-sky-500 text-white'
         : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
     }`
 
-   return (
+  return (
     <aside
-      className="
-        fixed left-0 top-16 w-64 h-[calc(100vh-64px)]
-        bg-stone-200 dark:bg-slate-800
-        border-r border-slate-300 dark:border-slate-700
-        flex flex-col
-      "
+      className={`fixed left-0 top-16 bottom-0 z-40 flex flex-col rounded-r-3xl
+        border-r border-slate-300 bg-sky-200 dark:border-slate-700 dark:bg-slate-900
+        overflow-hidden transition-[width] duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`}
     >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className="m-3 self-end rounded-lg px-2 py-1 text-lg text-slate-700 hover:bg-white/50 dark:text-slate-200 dark:hover:bg-slate-700"
+      >
+        {collapsed ? '»' : '«'}
+      </button>
 
-      {/* Navigation */}
-      <div className="flex-1 px-4 py-15">
-
-        {/* GENERAL */}
-        <div className="mb-8">
-
-          <h2 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">
-            General
-          </h2>
-
-          <div className="space-y-1">
-            <NavLink
-              to="/app/dashboard"
-              className={navLinkClass}
+      <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-4'}`}>
+        {navGroups.map(({ title, items }) => (
+          <section key={title} className="mb-8">
+            <h2
+              aria-hidden={collapsed}
+              className={`mb-3 whitespace-nowrap px-2 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400 ${
+                collapsed ? 'invisible opacity-0' : 'visible opacity-100'
+              }`}
             >
-              Dashboard
-            </NavLink>
+              {title}
+            </h2>
+            <div className="space-y-1">
+              {items.map(({ label, to, icon }) => (
+                <NavLink key={to} to={to} className={navLinkClass} title={collapsed ? label : undefined}>
+                  <span
+                    aria-hidden="true"
+                    className={`material-symbols-outlined text-center text-lg leading-none ${
+                      collapsed ? 'absolute left-0 w-full' : 'w-5'
+                    }`}
+                  >
+                    {icon}
+                  </span>
+                  <span className={`overflow-hidden whitespace-nowrap ${
+                    collapsed
+                      ? 'max-w-0 -translate-x-2 opacity-0'
+                      : 'max-w-[180px] translate-x-0 opacity-100'
+                  }`}>
+                    {label}
+                  </span>
+                </NavLink>
+              ))}
+            </div>
+          </section>
+        ))}
+      </nav>
+
+      <div className="border-t border-sky-300 px-5 pb-6 pt-4 dark:border-slate-800">
+        <div className="relative h-10">
+          <div className={`absolute top-0 flex h-10 w-10 items-center justify-center rounded-full bg-sky-500 text-sm font-semibold text-white transition-[left] duration-300 ease-in-out ${
+            collapsed ? 'left-1/2 -translate-x-1/2' : 'left-0 translate-x-0'
+          }`}>
+            {userInitials}
           </div>
-
-        </div>
-
-        {/* MODULES */}
-        <div className="mb-8">
-
-          <h2 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">
-            Modules
-          </h2>
-
-          <div className="space-y-1">
-
-            <NavLink
-              to="/app/analytics"
-              className={navLinkClass}
-            >
-              Analytics
-            </NavLink>
-
-            <NavLink
-              to="/app/payroll"
-              className={navLinkClass}
-            >
-              Payroll
-            </NavLink>
-
-            <NavLink
-              to="/app/roster"
-              className={navLinkClass}
-            >
-              Roster
-            </NavLink>
-
-            <NavLink
-              to="/app/employees"
-              className={navLinkClass}
-            >
-              Employee management
-            </NavLink>
-
-          </div>
-
-        </div>
-
-        <div className="mb-8">
-          <h2 className="mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-            Fixins
-          </h2>
-          <div className="space-y-1">
-            <NavLink
-              to="/app/settings"
-              className={navLinkClass}
-            >
-              Settings
-            </NavLink>
+          <div className={`overflow-hidden whitespace-nowrap transition-all duration-500 ease-in-out ${
+            collapsed ? 'max-w-0 translate-x-[-8px] opacity-0' : 'ml-[54px] max-w-[160px] translate-x-0 opacity-100'
+          }`}>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{userName}</p>
+            <p className="text-xs text-gray-800 dark:text-gray-400">{user?.role || 'Member'}</p>
           </div>
         </div>
-
-
       </div>
-
-      {/* Bottom User Profile */}
-      <div className="border-t border-slate-300 dark:border-slate-700 px-5 pt-4 pb-6">
-
-        <div className="flex items-center gap-3">
-
-          {/* Profile Image */}
-          <div className="w-10 h-10 rounded-full bg-gray-300 overflow-hidden">
-
-            {/* Later replace with actual image */}
-            <img
-              src="https://placehold.co/100x100"
-              alt="Profile"
-              className="w-full h-full object-cover"
-            />
-
-          </div>
-
-          {/* User Info */}
-          <div>
-
-            <p className="font-medium text-sm text-gray-800 dark:text-gray-200">
-              {user?.name || 'User'}
-            </p>
-
-            <p className="text-xs text-gray-800 dark:text-gray-400">
-              {user?.role || 'Member'}
-            </p>
-
-          </div>
-
-        </div>
-
-      </div>
-
     </aside>
   )
 }

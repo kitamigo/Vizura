@@ -163,10 +163,10 @@ export default function Rostering() {
   return (
     <div className="min-h-screen bg-transparent p-6">
       <div className="mx-auto max-w-[1600px]">
-        <section className="mb-6 flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 py-5 shadow-none backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <section className="mb-6 flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 pb-5 pt-0 shadow-none backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
-            <h1 className="text-3xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
-              Rostering
+            <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
+              Roster
             </h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">Plan and publish employee shifts.</p>
           </div>

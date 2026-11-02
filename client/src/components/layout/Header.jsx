@@ -34,9 +34,9 @@ function Header() {
   return (
     <header
       className={`
-        fixed top-0 left-0 w-full h-16
+        fixed top-0 left-0 w-full h-14
         bg-sky-200 text-slate-900 dark:bg-slate-900 dark:text-slate-100
-        border-b border-slate-300 dark:border-slate-800
+        border-b border-sky-200 dark:border-slate-800
         flex items-center justify-between px-6 z-50
         transition-colors duration-200
       `}

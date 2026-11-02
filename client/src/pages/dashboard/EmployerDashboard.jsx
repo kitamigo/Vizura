@@ -47,7 +47,7 @@ function EmployerDashboard() {
     <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="mx-auto max-w-[1600px] space-y-5">
         <section className="border-b border-sky-200/70 px-0 pb-4 dark:border-white/15">
-          <h1 className="text-3xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
+          <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
             Dashboard
           </h1>
         </section>

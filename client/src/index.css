@@ -7,3 +7,57 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #0284c7 #e0f2fe;
+}
+
+html.dark * {
+  scrollbar-color: #075985 #1e293b;
+}
+
+html.dark {
+  scrollbar-color: #075985 #1e293b;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #e0f2fe;
+}
+
+html.dark *::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+html.dark::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #0284c7;
+  border-radius: 9999px;
+}
+
+html.dark *::-webkit-scrollbar-thumb {
+  background: #075985;
+}
+
+html.dark::-webkit-scrollbar-thumb {
+  background: #075985;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #0369a1;
+}
+
+html.dark *::-webkit-scrollbar-thumb:hover {
+  background: #0c4a6e;
+}
+
+html.dark::-webkit-scrollbar-thumb:hover {
+  background: #0c4a6e;
+}
