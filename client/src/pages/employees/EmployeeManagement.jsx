@@ -1,19 +1,68 @@
 import { useState } from 'react'
-
-const initialEmployee = {
-  name: 'Alex Morgan',
-  role: 'Test employee',
-  email: 'alex.morgan@example.test',
-  status: 'Active',
-}
+import {
+  readDemoEmployees,
+  writeDemoEmployees,
+} from '../../services/demoRoster'
 
 function EmployeeManagement() {
-  const [employee, setEmployee] = useState(initialEmployee)
+  const [employees, setEmployees] = useState(readDemoEmployees)
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => readDemoEmployees()[0].id)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newEmployee, setNewEmployee] = useState({
+    name: '',
+    role: '',
+    email: '',
+    status: 'Active',
+  })
+  const [formError, setFormError] = useState('')
   const [saved, setSaved] = useState(false)
 
+  const employee = employees.find(({ id }) => id === selectedEmployeeId) || employees[0]
+
   const updateEmployee = (field) => (event) => {
-    setEmployee((current) => ({ ...current, [field]: event.target.value }))
+    const value = event.target.value
+    setEmployees((current) => current.map((item) => (
+      item.id === employee.id ? { ...item, [field]: value } : item
+    )))
     setSaved(false)
+  }
+
+  const updateNewEmployee = (field) => (event) => {
+    setNewEmployee((current) => ({ ...current, [field]: event.target.value }))
+    setFormError('')
+  }
+
+  const addEmployee = (event) => {
+    event.preventDefault()
+    const name = newEmployee.name.trim()
+    const role = newEmployee.role.trim()
+    const email = newEmployee.email.trim()
+
+    if (!name || !role || !email) {
+      setFormError('Name, role, and email address are required.')
+      return
+    }
+
+    const employeeToAdd = {
+      id: Date.now(),
+      name,
+      role,
+      email,
+      status: newEmployee.status,
+    }
+    const updatedEmployees = [...employees, employeeToAdd]
+    setEmployees(updatedEmployees)
+    writeDemoEmployees(updatedEmployees)
+    setSelectedEmployeeId(employeeToAdd.id)
+    setNewEmployee({ name: '', role: '', email: '', status: 'Active' })
+    setShowAddForm(false)
+    setFormError('')
+    setSaved(true)
+  }
+
+  const saveEmployees = () => {
+    writeDemoEmployees(employees)
+    setSaved(true)
   }
 
   const cardClass = 'rounded-xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/30 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-none'
@@ -29,21 +78,33 @@ function EmployeeManagement() {
               Employee management
             </h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">
-              Manage the current test employee profile.
+              Manage employee profiles and staff records.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setSaved(true)}
-            className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-400"
-          >
-            Save employee
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddForm((current) => !current)
+                setFormError('')
+              }}
+              className="rounded-lg border border-sky-300 px-4 py-2 text-sm font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-300/50 dark:text-sky-200 dark:hover:bg-sky-300/10"
+            >
+              {showAddForm ? 'Cancel' : 'Add employee'}
+            </button>
+            <button
+              type="button"
+              onClick={saveEmployees}
+              className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-400"
+            >
+              Save employee
+            </button>
+          </div>
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['Staff members', '1', 'Test employee'],
+            ['Staff members', String(employees.length), 'Employee records'],
             ['Profile status', employee.status, 'Current record'],
             ['Hourly rate', 'Not set', 'No payroll data'],
             ['Overtime logged', 'Not set', 'No roster data'],
@@ -60,16 +121,29 @@ function EmployeeManagement() {
           <aside className={cardClass}>
             <div className="border-b border-sky-100 pb-4 dark:border-white/10">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white">Staff directory</h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-sky-100/70">1 employee record</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-sky-100/70">{employees.length} employee record{employees.length === 1 ? '' : 's'}</p>
             </div>
-            <div className="mt-4 rounded-lg border border-sky-300 bg-sky-50/80 p-3 dark:border-sky-300/50 dark:bg-slate-900/50">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">{employee.name}</p>
-                <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-300/15 dark:text-emerald-200">
-                  {employee.status}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-sky-100/70">{employee.role}</p>
+            <div className="mt-4 space-y-2">
+              {employees.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedEmployeeId(item.id)}
+                  className={`w-full rounded-lg border p-3 text-left transition ${
+                    item.id === employee.id
+                      ? 'border-sky-300 bg-sky-50/80 dark:border-sky-300/50 dark:bg-slate-900/50'
+                      : 'border-sky-100 hover:border-sky-300 dark:border-white/10 dark:hover:border-sky-300/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{item.name}</p>
+                    <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-300/15 dark:text-emerald-200">
+                      {item.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-sky-100/70">{item.role}</p>
+                </button>
+              ))}
             </div>
           </aside>
 
@@ -108,6 +182,39 @@ function EmployeeManagement() {
           </article>
         </section>
 
+        {showAddForm && (
+          <section className={cardClass}>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Add employee</h2>
+            <form onSubmit={addEmployee} className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label>
+                <span className={labelClass}>Full name</span>
+                <input className={inputClass} value={newEmployee.name} onChange={updateNewEmployee('name')} autoFocus />
+              </label>
+              <label>
+                <span className={labelClass}>Role</span>
+                <input className={inputClass} value={newEmployee.role} onChange={updateNewEmployee('role')} />
+              </label>
+              <label>
+                <span className={labelClass}>Email address</span>
+                <input className={inputClass} type="email" value={newEmployee.email} onChange={updateNewEmployee('email')} />
+              </label>
+              <label>
+                <span className={labelClass}>Status</span>
+                <select className={inputClass} value={newEmployee.status} onChange={updateNewEmployee('status')}>
+                  <option>Active</option>
+                  <option>Inactive</option>
+                </select>
+              </label>
+              {formError && <p className="text-sm text-rose-600 sm:col-span-2 dark:text-rose-300">{formError}</p>}
+              <div className="sm:col-span-2">
+                <button type="submit" className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-400">
+                  Add employee
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+
         <section className={cardClass}>
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">Staff active schedules & role master grid</h2>
           <div className="mt-4 overflow-x-auto rounded-lg border border-sky-100 dark:border-white/10">
@@ -119,11 +226,15 @@ function EmployeeManagement() {
               <span>Schedule status</span>
             </div>
             <div className="grid min-w-[640px] grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-3 border-t border-sky-100 px-3 py-3 text-xs dark:border-white/10">
-              <span className="font-medium text-slate-900 dark:text-white">{employee.name}</span>
-              <span className="text-slate-600 dark:text-slate-300">{employee.role}</span>
-              <span className="text-slate-500 dark:text-slate-400">Not set</span>
-              <span className="text-slate-500 dark:text-slate-400">Not set</span>
-              <span className="text-slate-500 dark:text-slate-400">No roster data</span>
+              {employees.map((item) => (
+                <div key={item.id} className="col-span-5 grid grid-cols-subgrid border-t border-sky-100 px-3 py-3 text-xs dark:border-white/10">
+                  <span className="font-medium text-slate-900 dark:text-white">{item.name}</span>
+                  <span className="text-slate-600 dark:text-slate-300">{item.role}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Not set</span>
+                  <span className="text-slate-500 dark:text-slate-400">Not set</span>
+                  <span className="text-slate-500 dark:text-slate-400">No roster data</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>

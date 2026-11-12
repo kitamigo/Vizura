@@ -1,11 +1,31 @@
 export const demoRosterStorageKey = 'vizura-demo-roster'
 export const demoRosterChangedEvent = 'vizura-demo-roster-changed'
+export const employeeStorageKey = 'vizura-employees'
 
 export const testEmployee = {
   id: 1,
   name: 'Alex Morgan',
   role: 'Test employee',
   color: '#2563eb',
+}
+
+export function readDemoEmployees() {
+  const stored = localStorage.getItem(employeeStorageKey)
+  if (!stored) return [testEmployee]
+
+  try {
+    const employees = JSON.parse(stored)
+    return Array.isArray(employees) && employees.length
+      ? employees.map((employee) => ({ ...employee, color: employee.color || '#2563eb' }))
+      : [testEmployee]
+  } catch {
+    return [testEmployee]
+  }
+}
+
+export function writeDemoEmployees(employees) {
+  localStorage.setItem(employeeStorageKey, JSON.stringify(employees))
+  window.dispatchEvent(new Event(demoRosterChangedEvent))
 }
 
 export function getInitialDemoShifts() {

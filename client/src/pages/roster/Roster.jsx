@@ -23,16 +23,18 @@ const mondayOf = (d) => {
 
 const hoursBetween = (a, b) => (b - a) / 36e5;
 const shiftDurationMs = 60 * 60 * 1000;
+const formatDate = (date) => date.toLocaleDateString([], { day: '2-digit', month: 'short' });
 import {
+  demoRosterChangedEvent,
   readDemoShifts,
-  testEmployee,
+  readDemoEmployees,
   writeDemoShifts,
 } from '../../services/demoRoster';
 
 /* ------------------------------ page ------------------------------- */
 export default function Rostering() {
   const scheduler = useRef(null);
-  const [employees] = useState([testEmployee]);
+  const [employees, setEmployees] = useState(readDemoEmployees);
   const [range, setRange] = useState(() => {
     const start = mondayOf(new Date());
     const end = new Date(start);
@@ -49,9 +51,14 @@ export default function Rostering() {
 
   useEffect(() => {
     const refreshShifts = () => setShifts(readDemoShifts());
+    const refreshEmployees = () => setEmployees(readDemoEmployees());
     window.addEventListener('storage', refreshShifts);
+    window.addEventListener('storage', refreshEmployees);
+    window.addEventListener(demoRosterChangedEvent, refreshEmployees);
     return () => {
       window.removeEventListener('storage', refreshShifts);
+      window.removeEventListener('storage', refreshEmployees);
+      window.removeEventListener(demoRosterChangedEvent, refreshEmployees);
     };
   }, []);
 
@@ -159,35 +166,93 @@ export default function Rostering() {
   );
 
   const hasDrafts = shifts.some((s) => !s.IsPublished);
+  const scheduledHours = shifts.reduce((total, shift) => total + hoursBetween(shift.StartTime, shift.EndTime), 0);
+  const unassignedShifts = shifts.filter((shift) => !shift.EmployeeId).length;
+  const activeEmployeeCount = employees.filter((employee) => employee.status !== 'Inactive').length;
+  const weekLabel = `${formatDate(range.start)} - ${formatDate(range.end)}`;
+
+  const navigateWeek = (offset) => {
+    const date = new Date(range.start);
+    date.setDate(date.getDate() + offset * 7);
+    scheduler.current?.goToDate(date);
+  };
+
+  const addShift = () => {
+    const employee = employees[0];
+    if (!employee || !scheduler.current) return;
+    const start = new Date(range.start);
+    start.setHours(9, 0, 0, 0);
+    scheduler.current.addEvent({
+      Id: Date.now(),
+      Subject: `${employee.role || 'Employee'} shift`,
+      StartTime: start,
+      EndTime: new Date(start.getTime() + 8 * shiftDurationMs),
+      EmployeeId: employee.id,
+      RosterId: 1,
+      IsPublished: false,
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-transparent p-6">
+    <div className="min-h-screen bg-transparent p-4 text-slate-900 sm:p-6 dark:text-slate-100">
       <div className="mx-auto max-w-[1600px]">
-        <section className="mb-6 flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 pb-5 pt-0 shadow-none backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div>
-            <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
-              Roster
-            </h1>
-            <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">Plan and publish employee shifts.</p>
+        <section className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-xl font-semibold uppercase tracking-wide text-slate-900 dark:text-white">Rostering</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-lg border border-sky-200 bg-white/70 p-1 text-xs dark:border-white/10 dark:bg-slate-900/60">
+              <button type="button" onClick={() => navigateWeek(-1)} className="rounded px-2 py-1 hover:bg-sky-100 dark:hover:bg-white/10" aria-label="Previous week">‹</button>
+              <span className="min-w-32 px-2 text-center font-medium">{weekLabel}</span>
+              <button type="button" onClick={() => navigateWeek(1)} className="rounded px-2 py-1 hover:bg-sky-100 dark:hover:bg-white/10" aria-label="Next week">›</button>
+            </div>
+            <button type="button" onClick={addShift} className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-400">＋ Add shift</button>
+            <button
+              type="button"
+              onClick={publishWeek}
+              disabled={busy || !hasDrafts}
+              className="rounded-lg border border-sky-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+            >
+              Publish
+            </button>
           </div>
-          <button
-            onClick={publishWeek}
-            disabled={busy || !hasDrafts}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Publish roster
-          </button>
+        </section>
+
+        <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ['Total scheduled hours', `${scheduledHours.toFixed(0)} hrs`, '+14.2% vs last week', 'text-cyan-400'],
+            ['Est. labor cost', '$3,145', '+$320 vs last week', 'text-white'],
+            ['Active employees', `${activeEmployeeCount} Scheduled`, 'On track vs last week', 'text-white'],
+            ['Unassigned shifts', `${unassignedShifts} Open`, '−3 vs last week', 'text-white'],
+          ].map(([label, value, note, valueClass]) => (
+            <article key={label} className="rounded-xl border border-sky-200/70 bg-white/75 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/70">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">{label}</p>
+              <p className={`mt-2 text-xl font-semibold ${valueClass}`}>{value}</p>
+              <p className="mt-1 text-[10px] text-emerald-500">{note}</p>
+            </article>
+          ))}
         </section>
 
         {error && (
-          <div role="alert" className="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/30 dark:bg-red-950/30 dark:text-red-200">
             {error}
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <section className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Schedule Grid <span className="ml-2 rounded-full bg-emerald-500/15 px-2 py-1 text-[9px] font-semibold text-emerald-500">Live View</span></h2>
+          </div>
+          <div className="hidden gap-2 sm:flex">
+            <select className="rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-[10px] dark:border-white/10 dark:bg-slate-900/60" defaultValue="all">
+              <option value="all">Filter by Role: All</option>
+              {[...new Set(employees.map((employee) => employee.role).filter(Boolean))].map((role) => <option key={role}>{role}</option>)}
+            </select>
+            <button type="button" className="rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-[10px] dark:border-white/10 dark:bg-slate-900/60">Sort: Name</button>
+          </div>
+        </section>
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div
-            className="overflow-hidden rounded-xl border border-sky-200/80 bg-white/80 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none"
+            className="roster-schedule overflow-hidden rounded-xl border border-sky-200/80 bg-white/80 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/10 dark:bg-slate-900/70 dark:shadow-none"
             onDragOver={(event) => event.preventDefault()}
             onDrop={onCalendarDrop}
           >
@@ -263,6 +328,25 @@ export default function Rostering() {
             </div>
           </aside>
         </div>
+
+        <section className="grid gap-5 md:grid-cols-2">
+          <article className="rounded-xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/20 dark:border-white/10 dark:bg-slate-900/70 dark:shadow-none">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Open &amp; Unassigned Shifts</h2>
+            <div className="mt-3 rounded-lg border border-sky-100 bg-sky-50/70 p-3 text-xs dark:border-white/10 dark:bg-slate-950/40">
+              {unassignedShifts
+                ? `${unassignedShifts} shift${unassignedShifts === 1 ? '' : 's'} need an employee assignment.`
+                : 'No unassigned shifts for this roster.'}
+            </div>
+          </article>
+          <article className="rounded-xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/20 dark:border-white/10 dark:bg-slate-900/70 dark:shadow-none">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Compliance &amp; Overtime Flags</h2>
+            <div className="mt-3 border-l-4 border-amber-400 pl-3 text-xs text-slate-600 dark:text-slate-300">
+              {Object.entries(hoursByEmployee).some(([, hours]) => hours > 40)
+                ? 'One or more employees exceed 40 scheduled hours.'
+                : 'No overtime flags detected for this roster.'}
+            </div>
+          </article>
+        </section>
       </div>
     </div>
   );

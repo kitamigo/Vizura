@@ -61,3 +61,53 @@ html.dark *::-webkit-scrollbar-thumb:hover {
 html.dark::-webkit-scrollbar-thumb:hover {
   background: #0c4a6e;
 }
+
+.dark .roster-schedule .e-schedule {
+  background: #0b172a;
+  color: #e2e8f0;
+}
+
+.dark .roster-schedule .e-schedule .e-timeline-view,
+.dark .roster-schedule .e-schedule .e-timeline-month-view,
+.dark .roster-schedule .e-schedule .e-table-container,
+.dark .roster-schedule .e-schedule .e-content-wrap {
+  background: #0b172a;
+}
+
+.dark .roster-schedule .e-schedule .e-header-cells,
+.dark .roster-schedule .e-schedule .e-resource-cells,
+.dark .roster-schedule .e-schedule .e-work-cells {
+  background: #0f1d31;
+  border-color: #1e334d;
+  color: #cbd5e1;
+}
+
+.dark .roster-schedule .e-schedule .e-header-bar,
+.dark .roster-schedule .e-schedule .e-toolbar,
+.dark .roster-schedule .e-schedule .e-schedule-toolbar,
+.dark .roster-schedule .e-schedule .e-toolbar-items,
+.dark .roster-schedule .e-schedule .e-date-header-wrap,
+.dark .roster-schedule .e-schedule .e-date-header-container,
+.dark .roster-schedule .e-schedule .e-header-row {
+  background: #0b172a;
+  border-color: #1e334d;
+}
+
+.dark .roster-schedule .e-schedule .e-date-header-wrap table,
+.dark .roster-schedule .e-schedule .e-date-header-container table,
+.dark .roster-schedule .e-schedule .e-header-row td {
+  background: #0f1d31;
+  border-color: #1e334d;
+}
+
+.dark .roster-schedule .e-schedule .e-date-header-wrap .e-header-cells,
+.dark .roster-schedule .e-schedule .e-date-header-container .e-header-cells,
+.dark .roster-schedule .e-schedule .e-toolbar .e-tbar-btn {
+  background: #0b172a;
+}
+
+.dark .roster-schedule .e-schedule .e-toolbar .e-tbar-btn,
+.dark .roster-schedule .e-schedule .e-toolbar .e-tbar-btn .e-tbar-btn-text,
+.dark .roster-schedule .e-schedule .e-toolbar .e-icons {
+  color: #cbd5e1;
+}

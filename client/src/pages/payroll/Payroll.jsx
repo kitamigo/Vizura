@@ -6,7 +6,7 @@ function Payroll() {
       <div className="mx-auto max-w-[1600px] space-y-6">
         <section className="flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 pb-5 pt-0 backdrop-blur-md dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
-            <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
+            <h1 className="text-2xl font-semibold uppercase tracking-[0.05em] text-sky-700 dark:text-sky-200/90">
               Payroll
             </h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">

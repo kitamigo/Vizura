@@ -42,7 +42,7 @@ function Sidebar({ collapsed, onToggle }) {
 
   return (
     <aside
-      className={`fixed left-0 top-16 bottom-0 z-40 flex flex-col rounded-r-3xl
+      className={`fixed left-0 top-16 bottom-0 mb-2 z-40 flex flex-col rounded-r-xl
         border-r border-slate-300 bg-sky-200 dark:border-slate-700 dark:bg-slate-900
         overflow-hidden transition-[width] duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`}
     >
