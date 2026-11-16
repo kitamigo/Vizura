@@ -95,6 +95,29 @@ out
 .nuxt
 dist
 
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Python tooling
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets and local DB files
+.env.*
+!.env.example
+*.pem
+*.key
+*.sqlite3
+*.db
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js
