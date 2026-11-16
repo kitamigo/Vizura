@@ -24,8 +24,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Opens the roster before authentication for editing - TEMPORARY */}
-        <Route path="/" element={<Navigate to="/app/roster" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* App shell */}
         <Route path="/app" element={<MainLayout />}>
@@ -59,7 +58,11 @@ function App() {
 
           <Route
             path="roster"
-            element={<Roster />}
+            element={
+              <ProtectedRoute>
+                <Roster />
+              </ProtectedRoute>
+            }
           />
 
           <Route
