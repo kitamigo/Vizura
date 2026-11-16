@@ -42,8 +42,8 @@ function Header() {
       `}
     >
 
-      <div className="flex items-center">
-        <img src={logo} alt="Vizura" className="h-12" />
+      <div className="flex w-64 items-center justify-center">
+        <img src={logo} alt="Vizura" className="h-[38px] w-40" />
       </div>
 
       <div className="flex items-center">

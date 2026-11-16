@@ -12,16 +12,29 @@ export function AuthProvider({ children }) {
 
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user')
-    return storedUser ? JSON.parse(storedUser) : null
+    const token = localStorage.getItem('token')
+
+    if (!storedUser || !token) {
+      return null
+    }
+
+    try {
+      return JSON.parse(storedUser)
+    } catch {
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      return null
+    }
   })
 
-  // LOGIN
+  {/* LOGIN */}
   const login = async (email, password) => {
 
     const data = await loginUser(email, password)
 
     setUser(data.user)
 
+    localStorage.setItem('token', data.token)
     localStorage.setItem(
       'user',
       JSON.stringify(data.user)
@@ -30,13 +43,14 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  // REGISTER
+  {/* REGISTER */}
   const register = async (userData) => {
 
     const data = await registerUser(userData)
 
     setUser(data.user)
 
+    localStorage.setItem('token', data.token)
     localStorage.setItem(
       'user',
       JSON.stringify(data.user)
@@ -45,11 +59,12 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  // LOGOUT
+  {/* LOGOUT */}
   const logout = () => {
     setUser(null)
 
     localStorage.removeItem('user')
+    localStorage.removeItem('token')
   }
 
   return (

@@ -4,11 +4,12 @@ import {
   readDemoShifts,
   testEmployee,
 } from '../../services/demoRoster'
-
+{/* EmployerDashboard */}
 function EmployerDashboard() {
   const panelClass = 'rounded-xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/30 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-none'
   const [shifts, setShifts] = useState(readDemoShifts)
   const revenueBars = [62, 48, 42, 55, 51]
+  {/* calculates the start of the current week */}
   const weekStart = useMemo(() => {
     const date = new Date()
     date.setHours(0, 0, 0, 0)
@@ -16,6 +17,7 @@ function EmployerDashboard() {
     return date
   }, [])
 
+  {/* will refresh shifts when roster data changes */}
   useEffect(() => {
     const refreshShifts = () => setShifts(readDemoShifts())
     window.addEventListener(demoRosterChangedEvent, refreshShifts)
@@ -25,7 +27,7 @@ function EmployerDashboard() {
       window.removeEventListener('storage', refreshShifts)
     }
   }, [])
-
+  {/* formats the shift for a given day offset (0 = Monday, 6 = Sunday) */}
   const formatShift = (dayOffset) => {
     const shift = shifts.find((item) => {
       const shiftDate = new Date(item.StartTime)
@@ -36,7 +38,7 @@ function EmployerDashboard() {
     const formatHour = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     return `${formatHour(new Date(shift.StartTime))}-${formatHour(new Date(shift.EndTime))}`
   }
-
+  {/* generates the table rows for the roster table */}
   const tableRows = [[
     testEmployee.name,
     testEmployee.role,
@@ -46,12 +48,12 @@ function EmployerDashboard() {
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <section className="border-b border-sky-200/70 px-0 pb-4 dark:border-white/15">
+        <section className="px-0 pb-4">
           <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
             Dashboard
           </h1>
         </section>
-
+        {/* Roster and payroll section */}
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
           <article className={panelClass}>
             <div className="mb-4 flex items-start justify-between">
@@ -86,7 +88,7 @@ function EmployerDashboard() {
               ))}
             </div>
           </article>
-
+          {/* Payroll panel */}
           <article className={panelClass}>
             <div className="flex items-start justify-between">
               <div>
@@ -105,7 +107,7 @@ function EmployerDashboard() {
             </dl>
           </article>
         </section>
-
+        {/* Charts section */}
         <section className="grid gap-4 lg:grid-cols-2">
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Forecast chart</h2>
@@ -125,7 +127,7 @@ function EmployerDashboard() {
             </div>
             <p className="mt-3 text-right text-xs font-semibold text-sky-600 dark:text-sky-200">Test projection</p>
           </article>
-
+          {/* Revenue chart panel */}
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Revenue chart</h2>
             <p className="text-xs text-slate-500 dark:text-sky-100/70">Weekly revenue (last 5 weeks)</p>
