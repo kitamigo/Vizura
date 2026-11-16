@@ -24,6 +24,8 @@ def _database_url():
         url = "postgresql+psycopg2://" + url[len("postgres://"):]
     elif url.startswith("postgresql://"):
         url = "postgresql+psycopg2://" + url[len("postgresql://"):]
+    elif url.startswith("postgresql+psycopg://"):
+        url = "postgresql+psycopg2://" + url[len("postgresql+psycopg://"):]
     return url
 
 # flask app factory 
