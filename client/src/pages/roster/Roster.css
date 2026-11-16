@@ -5,3 +5,20 @@
     height: 80vh;
     width: calc(80vw - 250px);
 }
+
+.roster-schedule .e-resource-cells {
+    min-height: 72px;
+}
+
+.roster-schedule .e-resource-cells .roster-empty-resource {
+    opacity: 0.55;
+}
+
+.roster-schedule .e-resource-cells .roster-empty-resource::after {
+    content: '';
+    display: block;
+    width: 7rem;
+    margin-top: 0.4rem;
+    border-bottom: 1px dashed currentColor;
+    opacity: 0.5;
+}

@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import validates
 from .extensions import db
 
-ROLES = ("manager", "employee")
+ROLES = ("admin", "manager", "employee")
 
 # stores account details and access roles
 class User(db.Model):
@@ -20,7 +20,7 @@ class User(db.Model):
 
     __table_args__ = (
         CheckConstraint("email = lower(email)", name="ck_users_email_lowercase"),
-        CheckConstraint("role IN ('manager', 'employee')", name="ck_users_role"),
+        CheckConstraint("role IN ('admin', 'manager', 'employee')", name="ck_users_role"),
     )
 
     @validates("email")

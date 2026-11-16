@@ -23,16 +23,23 @@ const mondayOf = (d) => {
 
 const hoursBetween = (a, b) => (b - a) / 36e5;
 const shiftDurationMs = 60 * 60 * 1000;
+const emptyRosterRows = [
+  { id: 2, name: 'Open employee slot', role: 'Available for assignment', color: '#94a3b8', placeholder: true },
+  { id: 3, name: 'Open employee slot', role: 'Available for assignment', color: '#94a3b8', placeholder: true },
+  { id: 4, name: 'Open employee slot', role: 'Available for assignment', color: '#94a3b8', placeholder: true },
+  { id: 5, name: 'Open employee slot', role: 'Available for assignment', color: '#94a3b8', placeholder: true },
+];
 import {
   readDemoShifts,
   testEmployee,
   writeDemoShifts,
 } from '../../services/demoRoster';
+import './Roster.css';
 
 /* ------------------------------ page ------------------------------- */
 export default function Rostering() {
   const scheduler = useRef(null);
-  const [employees] = useState([testEmployee]);
+  const [employees] = useState([testEmployee, ...emptyRosterRows]);
   const [range, setRange] = useState(() => {
     const start = mondayOf(new Date());
     const end = new Date(start);
@@ -142,10 +149,10 @@ export default function Rostering() {
     const emp = employees.find((e) => e.id === props.resourceData.id);
     const hrs = hoursByEmployee[props.resourceData.id] ?? 0;
     return (
-      <div className="flex flex-col leading-tight">
+      <div className={`flex flex-col leading-tight ${emp?.placeholder ? 'roster-empty-resource' : ''}`}>
         <span className="font-medium">{emp?.name}</span>
         <span className="text-xs text-gray-500">
-          {emp?.role} Â· {hrs.toFixed(1)}h
+          {emp?.placeholder ? emp.role : `${emp?.role} - ${hrs.toFixed(1)}h`}
         </span>
       </div>
     );
@@ -153,12 +160,13 @@ export default function Rostering() {
 
   const eventTemplate = (props) => (
     <div className="px-1 text-xs">
-      {props.StartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} â€“{' '}
+      {props.StartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} -{' '}
       {props.EndTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
     </div>
   );
 
   const hasDrafts = shifts.some((s) => !s.IsPublished);
+  const visibleEmployees = employees.filter((employee) => !employee.placeholder);
 
   return (
     <div className="min-h-screen bg-transparent p-6">
@@ -193,6 +201,7 @@ export default function Rostering() {
           >
             <ScheduleComponent
               ref={scheduler}
+              className="roster-schedule"
               height="600px"
               width="100%"
               currentView="TimelineWeek"
@@ -243,7 +252,7 @@ export default function Rostering() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Employees</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">Drag an employee onto a calendar time.</p>
             <div className="mt-4 space-y-2">
-              {employees.map((employee) => (
+              {visibleEmployees.map((employee) => (
                 <div
                   key={employee.id}
                   draggable

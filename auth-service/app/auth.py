@@ -10,7 +10,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import IntegrityError
 from .extensions import db, limiter
-from .models import ROLES, Business, User
+from .models import Business, User
 
 bp = Blueprint("auth", __name__)
 ph = PasswordHasher()  # argon2id
@@ -37,13 +37,11 @@ def register():
     data = request.get_json(silent=True) or {}
     email = _clean(data.get("email"))
     password = data.get("password")
-    role = data.get("role") or "employee"
+    role = "admin"
     business_name = _clean(data.get("business_name"))
 
     if not email or not isinstance(password, str) or not password:
         return jsonify(message="Email and password are required"), 400
-    if role not in ROLES:
-        return jsonify(message="Invalid role"), 400
     if len(password) < 8:
         return jsonify(message="Password must be at least 8 characters"), 400
 
@@ -60,7 +58,7 @@ def register():
     db.session.add(user)
     try:
         db.session.flush()
-        if role == "manager" and business_name:
+        if role == "admin" and business_name:
             business = Business()
             business.user_id = user.user_id
             business.business_name = business_name
