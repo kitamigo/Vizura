@@ -19,9 +19,11 @@ def _database_url():
             f"postgresql+psycopg2://{quote_plus(user)}:{quote_plus(pw)}"
             f"@{host}:{os.environ.get('DB_PORT', '5432')}/{name}?sslmode=require"
         )
-    # for compatibility with Heroku, which uses the deprecated "postgres://" scheme
+    # use the installed psycopg2 driver for generic PostgreSQL URLs
     if url.startswith("postgres://"):
         url = "postgresql+psycopg2://" + url[len("postgres://"):]
+    elif url.startswith("postgresql://"):
+        url = "postgresql+psycopg2://" + url[len("postgresql://"):]
     return url
 
 # flask app factory 
