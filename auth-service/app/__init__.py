@@ -41,9 +41,18 @@ def create_app(config=None):
 
     if not app.config["JWT_SECRET"]:
         raise RuntimeError("JWT_SECRET must be set.")
-
-    origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
-    CORS(app, origins=origins or ["http://localhost:5173"])
+    # checks that the URL is valid/reachable Db
+    origins = [
+        origin.strip().rstrip("/")
+        for origin in os.environ.get("CORS_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": origins or ["http://localhost:5173"]}},
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)
