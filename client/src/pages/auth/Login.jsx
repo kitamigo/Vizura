@@ -29,7 +29,7 @@ function Login() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-sky-500 px-4 py-10">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-sky-300 px-4 py-10">
       <img src={logoDark} alt="Vizura" className="h-auto w-72 max-w-full" />
       <LoginForm onSubmit={handleLogin} />
     </div>

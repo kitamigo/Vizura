@@ -5,6 +5,7 @@ function LoginForm({ onSubmit }) {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -19,7 +20,7 @@ function LoginForm({ onSubmit }) {
     <div className="w-full max-w-md bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm transition-colors duration-200">
 
       {/* Heading */}
-      <h1 className="text-2xl font-bold mb-2 text-indigo-500 dark:text-indigo-400">
+      <h1 className="text-center text-2xl font-bold mb-2 text-blue-700 dark:text-sky-300">
         Sign In
       </h1>
 
@@ -37,7 +38,7 @@ function LoginForm({ onSubmit }) {
             placeholder="Enter your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500"
             required
           />
         </div>
@@ -48,21 +49,33 @@ function LoginForm({ onSubmit }) {
             Password
           </label>
 
-            <input
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500"
-            required
-          />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 rounded-xl px-4 py-3 pr-20 outline-none focus:ring-2 focus:ring-sky-500"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-3 flex cursor-pointer items-center text-blue-700 hover:text-blue-900 dark:text-sky-300 dark:hover:text-sky-200"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-xl">
+                  {showPassword ? 'visibility_off' : 'visibility'}
+                </span>
+              </button>
+            </div>
 
           {/* Forgot Password */}
           <div className="flex justify-end mt-2">
 
             <button
               type="button"
-              className="text-sm text-green-700 dark:text-green-400 hover:text-indigo-700 dark:hover:text-indigo-400"
+              className="text-sm text-blue-700 dark:text-sky-300 hover:text-blue-900 dark:hover:text-sky-200"
             >
               Forgot Password?
             </button>
@@ -73,7 +86,7 @@ function LoginForm({ onSubmit }) {
         {/* Login Button */}
         <button
           type="submit"
-          className="w-full cursor-pointer bg-sky-500 text-white py-3 rounded-xl font-medium hover:bg-sky-700 transition-colors"
+          className="w-full cursor-pointer bg-blue-700 text-white py-3 rounded-xl font-medium hover:bg-blue-800 transition-colors"
         >
           Sign In
         </button>
@@ -96,7 +109,7 @@ function LoginForm({ onSubmit }) {
       {/* Create Account */}
       <Link
         to="/register"
-        className="block text-center py-3 rounded-xl font-medium text-green-700 dark:text-green-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+        className="block text-center py-3 rounded-xl font-medium text-blue-700 dark:text-sky-300 hover:text-blue-900 dark:hover:text-sky-200 transition-colors"
       >
         Create Account
       </Link>
