@@ -189,8 +189,8 @@ export function useAnalyticsData(dateRange) {
       setForecastData((cur) => ({ ...cur, ...norm }))
       setAnomalies(norm.anomalies.length ? norm.anomalies : anomalies)
       setStatusMsg('Forecast updated from the model output.')
-    } catch {
-      setErrorMsg('Forecast endpoint is not ready yet or returned no data.')
+    } catch (error) {
+      setErrorMsg(error?.response?.data?.message || error?.response?.data?.error || 'Forecast endpoint is not ready yet or returned no data.')
     } finally {
       setLoadingForecast(false)
     }
@@ -214,8 +214,8 @@ export function useAnalyticsData(dateRange) {
         setForecastData((cur) => ({ ...cur, ...norm }))
       }
       setStatusMsg('Anomalies refreshed from the model output.')
-    } catch {
-      setErrorMsg('Anomaly endpoint is not ready yet or returned no data.')
+    } catch (error) {
+      setErrorMsg(error?.response?.data?.message || error?.response?.data?.error || 'Anomaly endpoint is not ready yet or returned no data.')
     } finally {
       setLoadingAnomalies(false)
     }
@@ -248,8 +248,13 @@ export function useAnalyticsData(dateRange) {
       } catch {
         // trend refresh failing shouldn't block the upload success state
       }
-    } catch {
-      setErrorMsg('Upload failed or the model endpoint did not return analytics data.')
+    } catch (error) {
+      const responseData = error?.response?.data
+      setErrorMsg(
+        responseData?.error ||
+        responseData?.message ||
+        'Upload failed or the model endpoint did not return analytics data.'
+      )
     } finally {
       setLoadingUpload(false)
     }

@@ -38,9 +38,9 @@ function createEmptySnapshot() {
 function getHolidayMap(csvContent) {
   if (!csvContent) return {}
   const lines = csvContent.trim().split('\n')
-  const headers = lines[0].toLowerCase().split(',')
+  const headers = lines[0].replace(/^\uFEFF/, '').toLowerCase().split(',')
   const dateIdx = headers.indexOf('date')
-  const holidayIdx = headers.indexOf('holiday_name')
+  const holidayIdx = headers.findIndex(h => h.trim() === 'holiday_name' || h.trim() === 'event_name')
   if (dateIdx === -1 || holidayIdx === -1) return {}
 
   const map = {}
@@ -58,7 +58,7 @@ function parseCsvToDataPoints(csvString) {
   const lines = csvString.trim().split('\n')
   if (lines.length < 2) return []
 
-  const headers = lines[0].toLowerCase().split(',')
+  const headers = lines[0].replace(/^\uFEFF/, '').toLowerCase().split(',').map(h => h.trim())
   const dateIdx = headers.findIndex(h => h.trim() === 'date')
   const revIdx = headers.findIndex(h => {
       const hh = h.trim()
