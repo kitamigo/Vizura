@@ -1,8 +1,16 @@
 import axios from 'axios'
 
 // creates the shared api client
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
+const isLocalDevelopment = window.location.hostname === 'localhost'
+const baseURL = configuredApiUrl || (
+  isLocalDevelopment
+    ? 'http://localhost:5000/api'
+    : 'https://vizura-server-l7d0.onrender.com/api'
+)
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL,
   headers: {
     'Content-Type': 'application/json'
   }
