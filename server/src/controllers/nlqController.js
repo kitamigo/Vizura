@@ -100,7 +100,8 @@ function normalizeNlqResponse(source, question) {
 
 // Calls the AI service NLQ endpoint
 async function callNlqModel(question) {
-  const modelUrl = process.env.NLQ_MODEL_URL || 'http://localhost:8000/nlquery/query'
+  const aiServiceUrl = (process.env.AI_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/, '')
+  const modelUrl = process.env.NLQ_MODEL_URL || `${aiServiceUrl}/nlquery/query`
 
   if (!modelUrl) {
     return null
@@ -149,7 +150,7 @@ async function queryNlq(req, res) {
         method: 'pending_model',
         rows: [],
         row_count: 0,
-        message: 'Configure NLQ_MODEL_URL or HF_NLQ_URL to connect your model.',
+        message: 'Configure AI_SERVICE_URL or NLQ_MODEL_URL to connect your model.',
       })
     }
 

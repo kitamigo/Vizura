@@ -21,12 +21,8 @@ router = APIRouter()
 
 class NLQueryRequest(BaseModel):
     """Request body with a plain-English question about sales data."""
-    question: str = Field(
-        ...,
-        min_length=3,
-        max_length=500,
-        examples=["What was my best performing month this year?"],
-    )
+    question: Optional[str] = Field(None, min_length=3, max_length=500)
+    sql: Optional[str] = Field(None, min_length=8, max_length=2000)
     business_id: Optional[str] = None
     table_name: str = "sales"
 
@@ -37,13 +33,13 @@ class NLQueryResponse(BaseModel):
     sql: str
     answer: str
     data: Optional[List[dict]] = None
-    mode: str  # "t5" or "rule_based"
+    mode: str  # "rule_based"
     business_id: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
     status: str
-    mode: str  # "t5_loaded" or "fallback_rule_based"
+    mode: str
     model_repo: str
 
 
@@ -51,14 +47,12 @@ class HealthResponse(BaseModel):
 
 @router.post("/query", response_model=NLQueryResponse)
 async def natural_language_query(request: NLQueryRequest):
-    """Convert a natural language question into SQL and a readable answer.
-
-    Uses the T5 model (kitamigo/vizura-t5-nlq) when available,
-    falling back to a rule-based engine for common sales questions.
-    """
+    """Convert a sales question to safe SQL or explain a supplied SQL query."""
     try:
+        if not request.question and not request.sql:
+            raise HTTPException(status_code=400, detail="question or sql is required")
         engine = get_nlq_engine(table_name=request.table_name)
-        result = engine.generate_query(request.question)
+        result = engine.generate_query(request.question or "", request.sql)
 
         return NLQueryResponse(
             question=result["question"],
@@ -68,6 +62,8 @@ async def natural_language_query(request: NLQueryRequest):
             mode=result["mode"],
             business_id=request.business_id,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("NLQ query failed")
         raise HTTPException(
@@ -78,13 +74,11 @@ async def natural_language_query(request: NLQueryRequest):
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Check if the T5 model is loaded or if fallback mode is active."""
+    """Report the active deterministic query mode."""
     engine = get_nlq_engine()
-    mode = "t5_loaded" if engine.model is not None else "fallback_rule_based"
-
     return HealthResponse(
         status="ok",
-        mode=mode,
+        mode=engine.mode,
         model_repo=engine.model_repo,
     )
 

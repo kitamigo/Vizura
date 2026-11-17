@@ -2,11 +2,9 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from app.routes import forecast, anomaly, nlquery
 
 # LOGGING
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -14,7 +12,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # APP
-
 app = FastAPI(
     title="Vizura AI Service",
     description=(
@@ -35,14 +32,12 @@ app.add_middleware(
 )
 
 # ROUTERS
-
 app.include_router(forecast.router, prefix="/forecast", tags=["Forecast"])
 app.include_router(anomaly.router, prefix="/anomaly", tags=["Anomaly"])
 app.include_router(nlquery.router, prefix="/nlquery", tags=["NL Query"])
 
 
 # ROOT/HEALTH
-
 @app.get("/")
 def root():
     return {
@@ -62,12 +57,10 @@ def root():
         },
     }
 
-
 @app.get("/health")
 def health_check():
     """Fast liveness check for hosting providers such as Render."""
     return {"status": "ok"}
-
 
 @app.get("/health/full")
 def full_health_check():
@@ -83,7 +76,7 @@ def full_health_check():
         nq = get_nlq_engine()
         health["modules"]["nlquery"] = {
             "ok": True,
-            "mode": "t5" if nq.model else "fallback",
+            "mode": nq.mode,
         }
     except Exception as e:
         health["modules"]["nlquery"] = {"ok": False, "error": str(e)}
