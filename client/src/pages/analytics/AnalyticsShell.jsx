@@ -23,6 +23,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
   const {
     anomalies,
     csvFile,
+    errorMsg,
     forecastPts,
     hasData,
     loadingAnomalies,
@@ -36,6 +37,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
     refreshAnomalies,
     revenueTrendPts,
     runSavedForecast,
+    statusMsg,
     setCsvFile,
     setQueryText,
     submitQuery,
@@ -121,6 +123,16 @@ function AnalyticsShell({ dateRange, setDateRange }) {
             >
               {loadingUpload ? 'Uploading...' : 'Upload CSV'}
             </Button>
+            {statusMsg ? (
+              <p className="mt-3 text-sm font-medium text-emerald-700 dark:text-emerald-300" role="status">
+                {statusMsg}
+              </p>
+            ) : null}
+            {errorMsg ? (
+              <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300" role="alert">
+                {errorMsg}
+              </p>
+            ) : null}
           </article>
 
           <article className="rounded-[26px] border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none">
