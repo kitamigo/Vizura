@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const { calcPayRun } = require('../utils/payrollEngine');
 const { isPublicHoliday } = require('../utils/nzHolidays');
-const { generatePayslipPDF } = require('../utils/payslipPdf');
+const { generatePayslipPDF } = require('../utils/payslipPDF');
 
 async function createPayRun(req, res) {
   try {
