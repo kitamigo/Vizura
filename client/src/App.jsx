@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import MainLayout from './components/layout/MainLayout.jsx'
 import Header from './components/layout/Header.jsx'
 
@@ -14,9 +14,12 @@ import Register from './pages/auth/Register.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 
 function App() {
+  const { pathname } = useLocation()
+  const isAuthPage = pathname === '/login' || pathname === '/register'
+
   return (
     <>
-      <Header />
+      {!isAuthPage && <Header />}
 
       <Routes>
 

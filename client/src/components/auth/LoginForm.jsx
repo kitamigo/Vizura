@@ -73,7 +73,7 @@ function LoginForm({ onSubmit }) {
         {/* Login Button */}
         <button
           type="submit"
-          className="w-full bg-indigo-500 text-white py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+          className="w-full cursor-pointer bg-sky-500 text-white py-3 rounded-xl font-medium hover:bg-sky-700 transition-colors"
         >
           Sign In
         </button>

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import LoginForm from '../../components/auth/LoginForm'
 import { useAuth } from '../../context/useAuth'
+import logoDark from '../../assets/logo_dark.svg'
 
 function Login() {
 
@@ -28,7 +29,8 @@ function Login() {
   }
 
   return (
-    <div className="flex items-center justify-center h-[calc(100vh-64px)] mt-16 bg-stone-300 dark:bg-slate-900 transition-colors duration-200">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-sky-500 px-4 py-10">
+      <img src={logoDark} alt="Vizura" className="h-auto w-72 max-w-full" />
       <LoginForm onSubmit={handleLogin} />
     </div>
   )

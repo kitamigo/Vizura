@@ -4,6 +4,7 @@
 # https://pyjwt.readthedocs.io/en/stable/usage.html
 
 import datetime as dt
+import re
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
@@ -37,20 +38,25 @@ def register():
     data = request.get_json(silent=True) or {}
     email = _clean(data.get("email"))
     password = data.get("password")
-    role = "admin"
-    business_name = _clean(data.get("business_name"))
+    role = "owner"
+    first_name = _clean(data.get("first_name"))
+    last_name = _clean(data.get("last_name"))
 
-    if not email or not isinstance(password, str) or not password:
-        return jsonify(message="Email and password are required"), 400
-    if len(password) < 8:
-        return jsonify(message="Password must be at least 8 characters"), 400
+    if not email or not isinstance(password, str) or not password or not first_name or not last_name:
+        return jsonify(message="First name, last name, email and password are required"), 400
+    if not re.fullmatch(r"[A-Za-z]{3,}", first_name) or not re.fullmatch(r"[A-Za-z]{3,}", last_name):
+        return jsonify(message="Names must contain at least 3 letters and no other characters"), 400
+    if len(password) < 8 or not re.search(r"[A-Z]", password) or not re.search(r"\d", password):
+        return jsonify(
+            message="Password must be at least 8 characters and include 1 uppercase letter and 1 number"
+        ), 400
 
     if User.query.filter_by(email=email.lower()).first():
         return jsonify(message="Email already in use"), 400
 
     user = User()
-    user.first_name = _clean(data.get("first_name"))
-    user.last_name = _clean(data.get("last_name"))
+    user.first_name = first_name[0].upper() + first_name[1:]
+    user.last_name = last_name[0].upper() + last_name[1:]
     user.email = email
     # stores only a secure password hash
     user.password_hash = ph.hash(password)
@@ -58,11 +64,6 @@ def register():
     db.session.add(user)
     try:
         db.session.flush()
-        if role == "admin" and business_name:
-            business = Business()
-            business.user_id = user.user_id
-            business.business_name = business_name
-            db.session.add(business)
         db.session.commit()
     except IntegrityError:  
         db.session.rollback()

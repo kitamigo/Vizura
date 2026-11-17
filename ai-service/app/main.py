@@ -49,6 +49,8 @@ def root():
         "service": "Vizura AI Service",
         "version": "0.1.0",
         "docs": "/docs",
+        "health": "/health",
+        "full_health": "/health/full",
         "endpoints": {
             "forecast": "/forecast/predict",
             "forecast_health": "/forecast/health",
@@ -62,6 +64,12 @@ def root():
 
 
 @app.get("/health")
+def health_check():
+    """Fast liveness check for hosting providers such as Render."""
+    return {"status": "ok"}
+
+
+@app.get("/health/full")
 def full_health_check():
     """Aggregate health of all AI service modules."""
     from app.models.nlq_engine import get_nlq_engine
