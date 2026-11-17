@@ -3,6 +3,9 @@ const { Pool } = require('pg');
 const databaseUrl = process.env.DATABASE_URL;
 const databasePort = Number(process.env.DB_PORT || 5432);
 const poolMax = Number(process.env.DB_POOL_MAX || 10);
+// TLS settings for external databases.
+const databaseSsl = process.env.DB_SSL;
+const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true';
 
 if (!databaseUrl && (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER || !process.env.DB_PASSWORD)) {
     throw new Error(
@@ -18,6 +21,24 @@ if (!Number.isInteger(poolMax) || poolMax < 1) {
     throw new Error('DB_POOL_MAX must be a positive integer.');
 }
 
+function getSslConfig() {
+    // uses no TLS if DB_SSL=false.
+    if (databaseSsl === 'false') {
+        return false;
+    }
+
+    // uses TLS for public databases.
+    if (databaseSsl === 'true' || databaseUrl?.includes('sslmode=require')) {
+        return { rejectUnauthorized };
+    }
+
+    if (databaseUrl) {
+        return false;
+    }
+
+    return process.env.DB_HOST ? { rejectUnauthorized } : false;
+}
+
 const pool = new Pool({
     ...(databaseUrl
         ? { connectionString: databaseUrl }
@@ -28,10 +49,7 @@ const pool = new Pool({
             user: process.env.DB_USER,
             password: process.env.DB_PASSWORD
         }),
-    // Azure Database for PostgreSQL requires TLS. Keep certificate validation enabled.
-    ssl: {
-        rejectUnauthorized: true
-    },
+    ssl: getSslConfig(),
     max: poolMax,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000
