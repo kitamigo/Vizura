@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import MainLayout from './components/layout/MainLayout.jsx'
 import Header from './components/layout/Header.jsx'
@@ -13,9 +14,24 @@ import Login from './pages/auth/Login.jsx'
 import Register from './pages/auth/Register.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 
+const pageTitles = {
+  '/login': 'Log in',
+  '/register': 'Create account',
+  '/app/dashboard': 'Dashboard',
+  '/app/analytics': 'Analytics',
+  '/app/payroll': 'Payroll',
+  '/app/roster': 'Roster',
+  '/app/employees': 'Staff management',
+  '/app/settings': 'Settings',
+}
+
 function App() {
   const { pathname } = useLocation()
   const isAuthPage = pathname === '/login' || pathname === '/register'
+
+  useEffect(() => {
+    document.title = `Vizura - ${pageTitles[pathname] || 'Page'}`
+  }, [pathname])
 
   return (
     <>
