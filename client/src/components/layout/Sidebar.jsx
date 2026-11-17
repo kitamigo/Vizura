@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
 
 const navGroups = [
@@ -22,7 +23,8 @@ const navGroups = [
 ]
 
 function Sidebar({ collapsed, onToggle }) {
-  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const userName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.name || 'User'
   const userPosition = user?.position || user?.role || 'Member'
   const userInitials = userName
@@ -101,13 +103,27 @@ function Sidebar({ collapsed, onToggle }) {
           }`}>
             {userInitials}
           </div>
-          <div className={`overflow-hidden whitespace-nowrap transition-all duration-500 ease-in-out ${
+          <div className={`relative overflow-hidden whitespace-nowrap transition-all duration-500 ease-in-out ${
             collapsed ? 'max-w-0 translate-x-[-8px] opacity-0' : 'ml-[54px] max-w-[160px] translate-x-0 opacity-100'
           }`}>
-            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{userName}</p>
+            <p className="pr-8 text-sm font-medium text-gray-800 dark:text-gray-200">{userName}</p>
             <p className="text-xs text-gray-800 dark:text-gray-400">
               {userPosition.charAt(0).toUpperCase() + userPosition.slice(1)}
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                logout()
+                navigate('/login', { replace: true })
+              }}
+              aria-label="Log out"
+              title="Log out"
+              className="absolute right-0 top-0 cursor-pointer text-slate-600 transition-colors hover:text-blue-700 dark:text-slate-400 dark:hover:text-sky-300"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-xl leading-none">
+                logout
+              </span>
+            </button>
           </div>
         </div>
       </div>
