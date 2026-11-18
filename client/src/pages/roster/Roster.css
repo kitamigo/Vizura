@@ -50,6 +50,33 @@
     box-shadow: inset 0 1px 2px rgb(14 116 144 / 6%);
 }
 
+.roster-trash-button {
+    display: inline-grid;
+    height: 2.25rem;
+    width: 2.25rem;
+    flex: 0 0 2.25rem;
+    place-items: center;
+    border: 1px solid #fca5a5;
+    border-radius: 999px;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 1.25rem;
+    font-weight: 800;
+    transition: all 150ms ease;
+}
+
+.roster-trash-button:not(:disabled):hover,
+.roster-trash-button.is-dragging {
+    transform: scale(1.08);
+    border-color: #ef4444;
+    background: #fee2e2;
+}
+
+.roster-trash-button:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
 .roster-calendar-panel {
     display: flex;
     min-height: 0;

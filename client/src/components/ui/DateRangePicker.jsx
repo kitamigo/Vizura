@@ -6,6 +6,7 @@ export function DateRangePicker({
   onRangeChange,
   availableStartDate,
   availableEndDate,
+  fixedWindowMonths = null,
 }) {
   const today = new Date();
   const datepickerTheme = {
@@ -22,7 +23,22 @@ export function DateRangePicker({
 
   const handleStartChange = (date) => {
     const nextStartDate = date;
-    const nextEndDate = endDate && date && date > endDate ? date : endDate;
+    let nextEndDate = endDate;
+
+    if (fixedWindowMonths && date) {
+      nextEndDate = new Date(date)
+      nextEndDate.setMonth(nextEndDate.getMonth() + fixedWindowMonths)
+      if (availableEndDate && nextEndDate > availableEndDate) {
+        nextEndDate = availableEndDate
+      }
+      if (availableStartDate && nextStartDate < availableStartDate) {
+        nextEndDate = new Date(availableStartDate)
+        nextEndDate.setMonth(nextEndDate.getMonth() + fixedWindowMonths)
+        if (availableEndDate && nextEndDate > availableEndDate) nextEndDate = availableEndDate
+      }
+    } else if (endDate && date && date > endDate) {
+      nextEndDate = date
+    }
 
     onRangeChange?.({
       startDate: nextStartDate,
@@ -32,7 +48,17 @@ export function DateRangePicker({
 
   const handleEndChange = (date) => {
     const nextEndDate = date;
-    const nextStartDate = startDate && date && date < startDate ? date : startDate;
+    let nextStartDate = startDate;
+
+    if (fixedWindowMonths && date) {
+      nextStartDate = new Date(date)
+      nextStartDate.setMonth(nextStartDate.getMonth() - fixedWindowMonths)
+      if (availableStartDate && nextStartDate < availableStartDate) {
+        nextStartDate = availableStartDate
+      }
+    } else if (startDate && date && date < startDate) {
+      nextStartDate = date
+    }
 
     onRangeChange?.({
       startDate: nextStartDate,
@@ -48,7 +74,7 @@ export function DateRangePicker({
         </span>
         <Datepicker
           theme={datepickerTheme}
-          value={startDate || null}
+          value={startDate || undefined}
           onChange={handleStartChange}
           minDate={availableStartDate || undefined}
           maxDate={endDate || availableEndDate || today}
@@ -63,7 +89,7 @@ export function DateRangePicker({
         </span>
         <Datepicker
           theme={datepickerTheme}
-          value={endDate || null}
+          value={endDate || undefined}
           onChange={handleEndChange}
           minDate={startDate || undefined}
           maxDate={availableEndDate || new Date()}

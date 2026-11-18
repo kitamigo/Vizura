@@ -62,7 +62,14 @@ function normalizeAnalyticsPayload(payload) {
   const rawAnomalies = payload?.anomalies
 
   return {
-    forecast: Array.isArray(rawForecast) ? rawForecast : zipForecastPoints(rawForecast),
+    forecast: Array.isArray(rawForecast)
+      ? rawForecast.map((point, index) => ({
+          date: point.date || point.ds || null,
+          predicted_revenue: point.predicted_revenue ?? point.ensemble_forecast ?? point.yhat ?? 0,
+          yhat_lower: point.yhat_lower ?? point.lower_bound ?? 0,
+          yhat_upper: point.yhat_upper ?? point.upper_bound ?? 0,
+        }))
+      : zipForecastPoints(rawForecast),
     // accepts { anomalies: [...] } or a bare array
     anomalies: normalizeAnomalyItems(
       Array.isArray(rawAnomalies) ? rawAnomalies : rawAnomalies?.anomalies,
@@ -313,7 +320,7 @@ export function useAnalyticsData(dateRange) {
             method: norm.method,
           },
           ...current.filter((item) => item.question !== norm.question),
-        ].slice(0, MAX_QUERY_HISTORY),
+        ].slice(0, 10),
       )
       setStatusMsg('Query executed.')
     } catch {
@@ -389,6 +396,26 @@ export function useAnalyticsData(dateRange) {
     }
   }
 
+  const deleteCsv = async (upload) => {
+    if (!upload) return
+    if (!window.confirm(`Delete "${upload.fileName}"? This cannot be undone.`)) return
+    try {
+      await deleteUploadedCsv(upload.id)
+      setUploadedCsvs((current) => current.filter((item) => item.id !== upload.id))
+      if (upload.isActive) {
+        setForecastPts([])
+        setAnomalies([])
+        setRevenueTrendPts([])
+        setUploadedFileName('')
+      }
+      setStatusMsg(`${upload.fileName} deleted.`)
+      setCustomEvents(upload.isActive ? [] : customEvents)
+      window.dispatchEvent(new Event('vizura-analytics-changed'))
+    } catch (error) {
+      setErrorMsg(getApiError(error, 'Could not delete the CSV.', ['message']))
+    }
+  }
+
   return {
     anomalies,
     csvFile,
@@ -423,5 +450,6 @@ export function useAnalyticsData(dateRange) {
     setDeleteTarget,
     addCustomEvent,
     confirmDeleteCsv,
+    deleteCsv,
   }
 }

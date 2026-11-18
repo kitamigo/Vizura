@@ -39,6 +39,8 @@ export default function RosterDayView({
   selectedEmployeeId,
   onUpdatePeriod,
   onHourDrop,
+  onShiftDragStart,
+  onDeleteShift,
   onOpenShift,
 }) {
   const dayShifts = shifts.filter((shift) => (
@@ -100,9 +102,10 @@ export default function RosterDayView({
                           key={shift.Id}
                           onClick={() => onOpenShift(shift.Id)}
                           draggable
-                          onDragStart={(event) => {
-                            event.dataTransfer.effectAllowed = 'move'
-                            event.dataTransfer.setData('application/vizura-shift', String(shift.Id))
+                          onDragStart={(event) => onShiftDragStart?.(event, shift.Id)}
+                          onContextMenu={(event) => {
+                            event.preventDefault()
+                            onDeleteShift?.(shift.Id)
                           }}
                         >
                           {shift.Section && <strong>{shift.Section}</strong>}

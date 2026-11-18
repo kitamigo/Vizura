@@ -23,7 +23,7 @@ function EmployerPayroll({ payRun }) {
             className="grid grid-cols-[minmax(0,1.4fr)_0.7fr_0.8fr_0.7fr] items-center gap-3 border-t border-sky-100 px-3 py-3 text-xs dark:border-white/10"
           >
             <span className="truncate font-medium text-slate-800 dark:text-slate-100">{employee.employee_name}</span>
-            <span className="text-slate-600 dark:text-slate-300">{employee.breakdown?.regularHours ?? '—'}</span>
+            <span className="text-slate-600 dark:text-slate-300">{employee.breakdown?.regularHours?.toFixed?.(1) ?? employee.breakdown?.regularHours ?? '—'}</span>
             <span className="font-medium text-sky-700 dark:text-sky-200">{money(employee.gross_pay)}</span>
             <span className="w-fit rounded-full px-2 py-1 text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-300/15 dark:text-emerald-200">
               Processed

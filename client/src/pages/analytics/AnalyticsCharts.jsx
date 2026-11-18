@@ -98,14 +98,23 @@ function getNiceTicks(min, max, tickCount = 4) {
 }
 
 export function ForecastBandChart({ data }) {
-  if (!data.length) {
+  const normalized = data
+    .filter((item) => item && Number.isFinite(Number(item.predicted_revenue)))
+    .map((item) => ({
+      ...item,
+      predicted_revenue: Number(item.predicted_revenue),
+      yhat_lower: Number.isFinite(Number(item.yhat_lower)) ? Number(item.yhat_lower) : Number(item.predicted_revenue),
+      yhat_upper: Number.isFinite(Number(item.yhat_upper)) ? Number(item.yhat_upper) : Number(item.predicted_revenue),
+    }))
+
+  if (!normalized.length) {
     return <div className="text-sm text-slate-500 dark:text-slate-300">No forecast data available.</div>
   }
 
   const width = 640
   const height = 260
   const padding = 44
-  const vals = data.flatMap((item) => [item.yhat_lower, item.predicted_revenue, item.yhat_upper])
+  const vals = normalized.flatMap((item) => [item.yhat_lower, item.predicted_revenue, item.yhat_upper])
   const min = Math.min(...vals)
   const max = Math.max(...vals)
   const rng = max - min || 1
@@ -114,16 +123,16 @@ export function ForecastBandChart({ data }) {
   const scaleY = (value) => height - padding - ((value - min) / rng) * (height - padding * 2)
   const scaleX = (index) => padding + index * xStep
 
-  const upperPts = data.map((item, index) => `${scaleX(index)},${scaleY(item.yhat_upper)}`).join(' ')
-  const lowerPts = data
+  const upperPts = normalized.map((item, index) => `${scaleX(index)},${scaleY(item.yhat_upper)}`).join(' ')
+  const lowerPts = normalized
     .slice()
     .reverse()
-    .map((item, index) => `${scaleX(data.length - 1 - index)},${scaleY(item.yhat_lower)}`)
+    .map((item, index) => `${scaleX(normalized.length - 1 - index)},${scaleY(item.yhat_lower)}`)
     .join(' ')
-  const linePts = data.map((item, index) => `${scaleX(index)},${scaleY(item.predicted_revenue)}`).join(' ')
+  const linePts = normalized.map((item, index) => `${scaleX(index)},${scaleY(item.predicted_revenue)}`).join(' ')
 
   const yTicks = getNiceTicks(min, max)
-  const labelEvery = Math.max(1, Math.ceil(data.length / 8))
+  const labelEvery = Math.max(1, Math.ceil(normalized.length / 8))
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full">
@@ -146,14 +155,14 @@ export function ForecastBandChart({ data }) {
       <polyline points={`${upperPts} ${lowerPts}`} fill="url(#forecast-band)" stroke="none" />
       <polyline points={linePts} fill="none" stroke="#1e3a8a" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" className="dark:stroke-sky-300" />
 
-      {data.map((item, index) => (
+      {normalized.map((item, index) => (
         <g key={item.date}>
           <circle cx={scaleX(index)} cy={scaleY(item.predicted_revenue)} r="4" className="cursor-pointer fill-[#1e3a8a] dark:fill-sky-300">
             <title>{`${formatDDMMYY(item.date)}: $${item.predicted_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })} (range $${Math.round(item.yhat_lower).toLocaleString()}–$${Math.round(item.yhat_upper).toLocaleString()})`}</title>
           </circle>
           {index % labelEvery === 0 && (
             <text x={scaleX(index)} y={height - 12} textAnchor="middle" className="fill-slate-500 text-[10px] dark:fill-slate-300">
-              {formatDDMMYY(item.date)}
+              {item.date ? formatDDMMYY(item.date) : `F${index + 1}`}
             </text>
           )}
         </g>

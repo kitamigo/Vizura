@@ -5,6 +5,7 @@ import {
 } from '../../services/demoRoster'
 import { fetchRevenueTrend, fetchSavedForecast } from '../../services/analyticsApi'
 import { getPayRuns } from '../../services/payrollApi'
+import { ForecastBandChart, ForecastTrendChart } from '../analytics/AnalyticsCharts'
 {/* EmployerDashboard */}
 function EmployerDashboard() {
   const panelClass = 'rounded-xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/30 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-none'
@@ -52,11 +53,20 @@ function EmployerDashboard() {
       fetchRevenueTrend({}).then((res) => setRevenuePoints(res?.points || [])).catch(() => setRevenuePoints([]))
       fetchSavedForecast().then((res) => {
         const forecast = res?.forecast
-        if (Array.isArray(forecast)) setForecastPoints(forecast)
+        if (Array.isArray(forecast)) {
+          setForecastPoints(forecast.map((point, index) => ({
+            date: point.date || point.ds || null,
+            predicted_revenue: point.predicted_revenue ?? point.ensemble_forecast ?? point.yhat ?? 0,
+            yhat_lower: point.yhat_lower ?? point.lower_bound ?? 0,
+            yhat_upper: point.yhat_upper ?? point.upper_bound ?? 0,
+          })))
+        }
         else if (Array.isArray(forecast?.dates)) {
           setForecastPoints(forecast.dates.map((date, index) => ({
             date,
             predicted_revenue: forecast.ensemble_forecast?.[index] ?? 0,
+            yhat_lower: forecast.lower_bound?.[index] ?? 0,
+            yhat_upper: forecast.upper_bound?.[index] ?? 0,
           })))
         } else setForecastPoints([])
       }).catch(() => setForecastPoints([]))
@@ -95,7 +105,7 @@ function EmployerDashboard() {
       if (key && !merged.has(key)) {
         merged.set(key, {
           id: shift.EmployeeId,
-          name: 'Assigned employee',
+          name: `Employee ${key}`,
           role: 'Employee',
           hourlyRate: 0,
         })
@@ -135,26 +145,16 @@ function EmployerDashboard() {
     const start = new Date(lastDate)
     start.setMonth(start.getMonth() - 5)
     start.setDate(1)
-
-    const byMonth = new Map()
-    sorted.forEach((point) => {
+    return sorted.filter((point) => {
       const date = new Date(`${point.date}T00:00:00`)
-      if (Number.isNaN(date.getTime()) || date < start || date > lastDate) return
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      byMonth.set(key, (byMonth.get(key) || 0) + Number(point.revenue || 0))
+      return !Number.isNaN(date.getTime()) && date >= start && date <= lastDate
     })
-    return [...byMonth.entries()].map(([key, revenue]) => ({
-      date: `${key}-01`,
-      revenue,
-    }))
   }, [revenuePoints])
   const revenueBars = latestRevenue.length
     ? latestRevenue.map((point) => Number(point.revenue || 0))
     : []
   const maxRevenue = Math.max(...revenueBars, 1)
-  const dashboardForecast = forecastPoints.length
-    ? [...forecastPoints].filter((point, index) => index === 0 || (index + 1) % Math.max(1, Math.ceil(forecastPoints.length / 6)) === 0).slice(0, 6)
-    : []
+  const dashboardForecast = forecastPoints
 
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
@@ -183,8 +183,8 @@ function EmployerDashboard() {
                 <span>Sat</span>
                 <span>Sun</span>
               </div>
-              {tableRows.map((row) => (
-                <div key={row[0]} className="grid min-w-[780px] grid-cols-[1.4fr_1fr_repeat(7,0.7fr)] gap-2 border-t border-sky-100 px-3 py-3 text-[10px] dark:border-white/10">
+              {tableRows.map((row, rowIndex) => (
+                <div key={`${row[0]}-${rowIndex}`} className="grid min-w-[780px] grid-cols-[1.4fr_1fr_repeat(7,0.7fr)] gap-2 border-t border-sky-100 px-3 py-3 text-[10px] dark:border-white/10">
                   {row.map((cell, index) => (
                     <span key={`${row[0]}-${index}`} className={index === 0 ? 'font-medium text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}>
                       {cell}
@@ -223,43 +223,17 @@ function EmployerDashboard() {
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Forecast chart</h2>
             <p className="text-xs text-slate-500 dark:text-sky-100/70">Projected revenue (next 6 months)</p>
-            <div className="relative mt-4 h-32 overflow-hidden rounded-lg border border-sky-100 bg-slate-50 dark:border-white/10 dark:bg-slate-950/40">
-              <div className="absolute inset-0 flex flex-col justify-between p-3">
-                {[1, 2, 3, 4].map((line) => <span key={line} className="border-t border-sky-100 dark:border-white/10" />)}
-              </div>
-              <div className="absolute bottom-3 left-3 right-3 flex h-20 items-end gap-3">
-                {(dashboardForecast.length ? dashboardForecast : [{}, {}, {}, {}, {}, {}]).map((point, index) => (
-                  <div key={point.date || index} className="flex-1 rounded-t-full bg-gradient-to-t from-sky-500 to-cyan-300" style={{ height: `${dashboardForecast.length ? 20 + (index * 10) : 20}%` }} />
-                ))}
-              </div>
+            <div className="mt-4 rounded-lg border border-sky-100 bg-slate-50 p-2 dark:border-white/10 dark:bg-slate-950/40">
+              <ForecastBandChart data={dashboardForecast} />
             </div>
-            <div className="mt-3 flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
-              {(dashboardForecast.length ? dashboardForecast : [{}, {}, {}, {}, {}, {}]).map((point, index) =>
-                <span key={point.date || index}>{point.date ? point.date.slice(5) : `M${index + 1}`}</span>,
-              )}
-            </div>
-            <p className="mt-3 text-right text-xs font-semibold text-sky-600 dark:text-sky-200">{forecastPoints.length ? 'Live forecast' : 'Awaiting CSV'}</p>
           </article>
           {/* Revenue chart panel */}
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Revenue chart</h2>
-            <p className="text-xs text-slate-500 dark:text-sky-100/70">Recent uploaded revenue</p>
-            <div className="relative mt-4 h-32 overflow-hidden rounded-lg border border-sky-100 bg-slate-50 dark:border-white/10 dark:bg-slate-950/40">
-              <div className="absolute inset-0 flex flex-col justify-between p-3">
-                {[1, 2, 3, 4].map((line) => <span key={line} className="border-t border-sky-100 dark:border-white/10" />)}
-              </div>
-              <div className="absolute bottom-3 left-3 right-3 flex h-20 items-end gap-4 px-2">
-                {revenueBars.map((value, index) => (
-                  <div key={index} className="flex-1 rounded-t bg-sky-400" style={{ height: `${Math.max(8, (value / maxRevenue) * 100)}%` }} />
-                ))}
-              </div>
+            <p className="text-xs text-slate-500 dark:text-sky-100/70">Revenue trend (latest six months)</p>
+            <div className="mt-4 rounded-lg border border-sky-100 bg-slate-50 p-2 dark:border-white/10 dark:bg-slate-950/40">
+              <ForecastTrendChart data={latestRevenue} />
             </div>
-            <div className="mt-3 flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
-              {latestRevenue.map((point, index) => <span key={point.date || index}>{point.date ? point.date.slice(5) : `—${index + 1}`}</span>)}
-            </div>
-            <p className="mt-3 text-right text-xs font-semibold text-slate-900 dark:text-white">
-              {revenueBars.length ? `$${revenueBars.reduce((sum, value) => sum + value, 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : 'Awaiting CSV'}
-            </p>
           </article>
         </section>
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import EmployerPayroll from '../../pages/payroll/EmployerPayroll'
 import GeneratePayslipForm from './GeneratePayslipForm'
 import { getPayRuns } from '../../services/payrollApi'
+import { demoRosterChangedEvent, readDemoShifts } from '../../services/demoRoster'
 
 // - Payroll page - //
 function Payroll() {
@@ -10,6 +11,65 @@ function Payroll() {
   const [error, setError] = useState('')
   const [payPeriodStart, setPayPeriodStart] = useState('')
   const [payPeriodEnd, setPayPeriodEnd] = useState('')
+  const [rosterShifts, setRosterShifts] = useState(readDemoShifts)
+  const [employees, setEmployees] = useState([])
+
+  const getCurrentWeek = () => {
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+    const end = new Date(start)
+    end.setDate(end.getDate() + 6)
+    const format = (date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    return { start: format(start), end: format(end) }
+  }
+
+  const movePayPeriod = (weeks) => {
+    const start = new Date(`${payPeriodStart || getCurrentWeek().start}T00:00:00`)
+    start.setDate(start.getDate() + (weeks * 7))
+    const end = new Date(start)
+    end.setDate(end.getDate() + 6)
+    const format = (date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    setPayPeriodStart(format(start))
+    setPayPeriodEnd(format(end))
+  }
+
+  useEffect(() => {
+    const current = getCurrentWeek()
+    setPayPeriodStart((value) => value || current.start)
+    setPayPeriodEnd((value) => value || current.end)
+  }, [])
+
+  useEffect(() => {
+    const refreshRoster = () => setRosterShifts(readDemoShifts())
+    const refreshEmployees = () => {
+      try {
+        setEmployees(JSON.parse(localStorage.getItem('vizura-employees') || '[]'))
+      } catch {
+        setEmployees([])
+      }
+    }
+    refreshRoster()
+    refreshEmployees()
+    window.addEventListener(demoRosterChangedEvent, refreshRoster)
+    window.addEventListener('storage', refreshRoster)
+    window.addEventListener('vizura-employees-changed', refreshEmployees)
+    return () => {
+      window.removeEventListener(demoRosterChangedEvent, refreshRoster)
+      window.removeEventListener('storage', refreshRoster)
+      window.removeEventListener('vizura-employees-changed', refreshEmployees)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -17,10 +77,9 @@ function Payroll() {
       .then((runs) => {
         if (active) {
           setPayRuns(runs)
-          if (runs[0]) {
-            setPayPeriodStart(runs[0].pay_period_start || '')
-            setPayPeriodEnd(runs[0].pay_period_end || '')
-          }
+          const current = getCurrentWeek()
+          setPayPeriodStart(current.start)
+          setPayPeriodEnd(current.end)
         }
       })
       .catch((err) => {
@@ -32,11 +91,48 @@ function Payroll() {
     return () => { active = false }
   }, [])
 
-  const latest = payRuns[0]
+  const periodRuns = payRuns.filter((run) =>
+    run.pay_period_start === payPeriodStart && run.pay_period_end === payPeriodEnd,
+  )
+  const latest = periodRuns[0] || null
   const money = (value) => new Intl.NumberFormat('en-NZ', {
     style: 'currency',
     currency: 'NZD',
   }).format(Number(value || 0))
+
+  const periodStart = payPeriodStart ? new Date(`${payPeriodStart}T00:00:00`) : null
+  const periodEnd = payPeriodEnd ? new Date(`${payPeriodEnd}T23:59:59`) : null
+  const publishedShifts = rosterShifts.filter((shift) => {
+    if (!shift.IsPublished) return false
+    const date = new Date(shift.StartTime)
+    return (!periodStart || date >= periodStart) && (!periodEnd || date <= periodEnd)
+  })
+  const scheduledHours = publishedShifts.reduce((total, shift) =>
+    total + Math.max(0, (new Date(shift.EndTime) - new Date(shift.StartTime)) / 36e5), 0)
+  const activeEmployeeIds = new Set(publishedShifts
+    .map((shift) => String(shift.EmployeeId ?? ''))
+    .filter(Boolean))
+  const labourCost = publishedShifts.reduce((total, shift) => {
+    const employee = employees.find((item) => String(item.id) === String(shift.EmployeeId))
+    const hours = Math.max(0, (new Date(shift.EndTime) - new Date(shift.StartTime)) / 36e5)
+    const rate = Number(employee?.hourlyRate || 0)
+    return total + (hours * rate)
+  }, 0)
+  const grossPay = labourCost
+  const employeeCount = activeEmployeeIds.size
+  const rosterPayslips = [...activeEmployeeIds].map((employeeId) => {
+    const employee = employees.find((item) => String(item.id) === employeeId)
+    const employeeShifts = publishedShifts.filter((shift) => String(shift.EmployeeId) === employeeId)
+    const hours = employeeShifts.reduce((total, shift) =>
+      total + Math.max(0, (new Date(shift.EndTime) - new Date(shift.StartTime)) / 36e5), 0)
+    const hourlyRate = Number(employee?.hourlyRate || 0)
+    return {
+      payslip_id: `roster-${employeeId}`,
+      employee_name: employee ? `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || 'Unnamed employee' : `Employee ${employeeId}`,
+      gross_pay: hours * hourlyRate,
+      breakdown: { regularHours: Number(hours.toFixed(2)) },
+    }
+  })
 
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
@@ -48,10 +144,10 @@ function Payroll() {
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['Gross pay', money(latest?.gross_pay), latest ? 'Live' : 'No data'],
-            ['Total deductions', money(latest?.total_deductions), latest ? 'Live' : 'No data'],
-            ['Employer contributions', money(latest?.employer_contributions), latest ? 'Live' : 'No data'],
-            ['Net distribution', money(latest?.net_pay), latest ? 'Live' : 'No data'],
+            ['Gross pay', money(grossPay), publishedShifts.length ? 'Live roster' : 'No roster'],
+            ['Scheduled hours', `${scheduledHours.toFixed(1)}h`, publishedShifts.length ? 'Live roster' : 'No roster'],
+            ['Estimated labour cost', money(labourCost), publishedShifts.length ? 'Live roster' : 'No roster'],
+            ['Active employees', String(employeeCount), employeeCount ? 'Live roster' : 'No roster'],
           ].map(([label, value, note]) => (
             <article
               key={label}
@@ -64,12 +160,14 @@ function Payroll() {
                 </span>
               </div>
               <p className="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Current pay period</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {payPeriodStart && payPeriodEnd ? `${payPeriodStart} – ${payPeriodEnd}` : 'Current pay period'}
+              </p>
             </article>
           ))}
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-2xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/30 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-none sm:p-5">
             <div className="flex flex-col gap-3 border-b border-sky-100 pb-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -77,6 +175,14 @@ function Payroll() {
                 <p className="text-xs text-slate-500 dark:text-sky-100/70">Review payroll actions before processing.</p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => movePayPeriod(-1)}
+                  className="mt-5 rounded-lg border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 dark:border-white/15 dark:text-sky-200"
+                  aria-label="Previous week"
+                >
+                  ←
+                </button>
                 <label className="text-xs font-semibold text-slate-500 dark:text-slate-300">
                   From
                   <input
@@ -86,6 +192,25 @@ function Payroll() {
                     className="mt-1 block rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-200 dark:border-white/15 dark:bg-slate-950/50 dark:text-white"
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => movePayPeriod(1)}
+                  className="mt-5 rounded-lg border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 dark:border-white/15 dark:text-sky-200"
+                  aria-label="Next week"
+                >
+                  →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = getCurrentWeek()
+                    setPayPeriodStart(current.start)
+                    setPayPeriodEnd(current.end)
+                  }}
+                  className="mt-5 rounded-lg bg-sky-500 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-400"
+                >
+                  This week
+                </button>
                 <label className="text-xs font-semibold text-slate-500 dark:text-slate-300">
                   To
                   <input
@@ -98,12 +223,16 @@ function Payroll() {
                 </label>
               </div>
             </div>
-            {loading ? (
+            {!publishedShifts.length && !loading ? (
+              <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-800 dark:border-amber-300/20 dark:bg-amber-950/20 dark:text-amber-200">
+                No published roster shifts for this pay period. Publish a roster to populate payroll totals.
+              </p>
+            ) : loading ? (
               <p className="py-6 text-sm text-slate-500">Loading payroll...</p>
-            ) : error ? (
+            ) : error && !publishedShifts.length ? (
               <p className="py-6 text-sm text-rose-600">{error}</p>
             ) : (
-              <EmployerPayroll payRun={latest} />
+              <EmployerPayroll payRun={latest?.payslips ? latest : { payslips: rosterPayslips }} />
             )}
           </div>
 
@@ -133,7 +262,7 @@ function Payroll() {
         </section>
 
         <section>
-          <GeneratePayslipForm />
+          <GeneratePayslipForm payPeriodStart={payPeriodStart} payPeriodEnd={payPeriodEnd} />
         </section>
       </div>
 

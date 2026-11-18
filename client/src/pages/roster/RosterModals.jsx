@@ -228,7 +228,7 @@ export function AddShiftModal({
   )
 }
 
-export function ShiftDetailsModal({ shift, employees, onClose }) {
+export function ShiftDetailsModal({ shift, employees, onClose, onDelete }) {
   if (!shift) return null
   const employee = employees.find((record) => record.id === shift.EmployeeId)
   return (
@@ -249,6 +249,11 @@ export function ShiftDetailsModal({ shift, employees, onClose }) {
         <div><dt>Status</dt><dd>{shift.IsPublished ? 'Published' : 'Draft'}</dd></div>
       </dl>
       <div className="roster-modal-actions">
+        {onDelete && (
+          <button type="button" onClick={() => onDelete(shift.Id)} className="roster-secondary-button !border-rose-200 !text-rose-600">
+            Delete shift
+          </button>
+        )}
         <button type="button" onClick={onClose} className="roster-primary-button">Close</button>
       </div>
     </Modal>

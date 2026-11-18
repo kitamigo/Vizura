@@ -86,7 +86,7 @@ function normaliseEmploymentType(value) {
 }
 
 // manages payslip fields, roster hours and PDF generation
-function GeneratePayslipForm() {
+function GeneratePayslipForm({ payPeriodStart: externalStart, payPeriodEnd: externalEnd }) {
   const [payPeriod, setPayPeriod] = useState(getWeekRange)
   const [form, setForm] = useState(() => ({
     ...initialForm,
@@ -108,6 +108,22 @@ function GeneratePayslipForm() {
       window.removeEventListener('vizura-employees-changed', refreshEmployees)
     }
   }, [])
+
+  useEffect(() => {
+    if (!externalStart || !externalEnd) return
+    setPayPeriod({ start: externalStart, end: externalEnd })
+    setForm((current) => {
+      const shifts = getRosterShifts(current.employeeId, externalStart, externalEnd)
+      const hours = shifts.reduce((total, shift) => total + shift.hours, 0)
+      return {
+        ...current,
+        payPeriodStart: externalStart,
+        payPeriodEnd: externalEnd,
+        hoursWorked: hours ? hours.toFixed(2) : '',
+        shifts,
+      }
+    })
+  }, [externalStart, externalEnd])
 
   useEffect(() => {
     const refreshRosterHours = () => {
@@ -143,6 +159,7 @@ function GeneratePayslipForm() {
       lastName: employee?.lastName || '',
       taxCode: employee?.taxCode || 'M',
       irdNumber: employee?.irdNumber || '',
+      address: employee?.address || '',
       kiwisaverRate: employee?.kiwisaverRate || '3',
       hourlyRate: employee?.hourlyRate || '',
       hoursWorked: hours ? Number(hours.toFixed(2)).toString() : '',
@@ -214,6 +231,17 @@ function GeneratePayslipForm() {
     return () => window.clearTimeout(timer)
   }, [autoGenerate, form.employeeId, form.hourlyRate, form.hoursWorked, form.payPeriodStart, form.payPeriodEnd])
 
+  const periodEmployees = employees.filter((employee) => {
+    const start = form.payPeriodStart ? new Date(`${form.payPeriodStart}T00:00:00`) : null
+    const end = form.payPeriodEnd ? new Date(`${form.payPeriodEnd}T23:59:59`) : null
+    return readDemoShifts().some((shift) => {
+      if (!shift.IsPublished) return false
+      if (String(shift.EmployeeId) !== String(employee.id)) return false
+      const shiftDate = new Date(shift.StartTime)
+      return (!start || shiftDate >= start) && (!end || shiftDate <= end)
+    })
+  })
+
   // - Generate payslip form - //
   return (
     <div className={cardClass}>
@@ -246,12 +274,17 @@ function GeneratePayslipForm() {
               onChange={(event) => selectEmployee(event.target.value)}
             >
               <option value="">Select an employee</option>
-              {employees.map((employee) => (
+              {periodEmployees.map((employee) => (
                 <option key={employee.id} value={employee.id}>
                   {`${employee.firstName || ''} ${employee.lastName || ''}`.trim() || 'Unnamed employee'}
                 </option>
               ))}
             </select>
+            {!periodEmployees.length && (
+              <p className="mt-2 text-xs font-normal text-amber-700 dark:text-amber-300">
+                No employees have published shifts for this pay period. Publish a roster first.
+              </p>
+            )}
           </label>
           <label>
             <span className={labelClass}>Pay period start *</span>

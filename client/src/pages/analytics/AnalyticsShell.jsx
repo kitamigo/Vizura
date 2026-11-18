@@ -47,6 +47,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
     uploadedCsvs,
     activatingCsvId,
     activateCsv,
+    deleteCsv,
   } = useAnalyticsData(dateRange)
 
   const rangeLbl =
@@ -54,19 +55,21 @@ function AnalyticsShell({ dateRange, setDateRange }) {
       ? `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`
       : 'Select a date range to focus the dashboard'
 
-  const availableDates = useMemo(() => {
-    if (!revenueTrendPts.length) return { start: null, end: null }
+  const activeUpload = useMemo(
+    () => uploadedCsvs.find((upload) => upload.isActive) || uploadedCsvs[0] || null,
+    [uploadedCsvs],
+  )
 
-    const dates = revenueTrendPts
-      .map((point) => point.date)
-      .filter(Boolean)
-      .sort()
+  const availableDates = useMemo(() => {
+    if (!activeUpload?.startDate || !activeUpload?.endDate) {
+      return { start: null, end: null }
+    }
 
     return {
-      start: dates.length ? new Date(`${dates[0]}T00:00:00`) : null,
-      end: dates.length ? new Date(`${dates[dates.length - 1]}T00:00:00`) : null,
+      start: new Date(`${activeUpload.startDate}T00:00:00`),
+      end: new Date(`${activeUpload.endDate}T00:00:00`),
     }
-  }, [revenueTrendPts])
+  }, [activeUpload])
 
   const availableRangeLbl =
     availableDates.start && availableDates.end
@@ -128,6 +131,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
                 onRangeChange={setDateRange}
                 availableStartDate={availableDates.start}
                 availableEndDate={availableDates.end}
+                fixedWindowMonths={6}
               />
             </div>
           </article>
@@ -176,27 +180,40 @@ function AnalyticsShell({ dateRange, setDateRange }) {
                 {uploadedCsvs.length ? (
                   <div className="mt-2 max-h-[140px] space-y-2 overflow-y-auto">
                     {uploadedCsvs.map((upload) => (
-                      <button
+                      <div
                         key={upload.id}
-                        type="button"
-                        onClick={() => activateCsv(upload.id)}
-                        disabled={activatingCsvId === upload.id}
-                        className={`w-full rounded-xl border px-3 py-2 text-left transition ${
+                        className={`flex items-stretch rounded-xl border transition ${
                           upload.isActive
                             ? 'border-sky-400 bg-sky-100 text-sky-900 dark:border-sky-500 dark:bg-sky-900/40 dark:text-sky-100'
                             : 'border-sky-100 bg-white text-slate-700 hover:border-sky-300 hover:bg-sky-50 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900'
                         }`}
                       >
-                        <span className="block truncate text-sm font-medium">
-                          {activatingCsvId === upload.id ? 'Activating...' : upload.fileName}
-                        </span>
-                        <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                          {upload.rowCount} rows
-                          {upload.startDate && upload.endDate
-                            ? ` · ${formatDDMMYY(upload.startDate)}–${formatDDMMYY(upload.endDate)}`
-                            : ''}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => activateCsv(upload.id)}
+                          disabled={activatingCsvId === upload.id}
+                          className="min-w-0 flex-1 px-3 py-2 text-left"
+                        >
+                          <span className="block truncate text-sm font-medium">
+                            {activatingCsvId === upload.id ? 'Activating...' : upload.fileName}
+                          </span>
+                          <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                            {upload.rowCount} rows
+                            {upload.startDate && upload.endDate
+                              ? ` · ${formatDDMMYY(upload.startDate)}–${formatDDMMYY(upload.endDate)}`
+                              : ''}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteCsv(upload)}
+                          className="m-1 rounded-lg px-2 text-rose-600 transition hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                          aria-label={`Delete ${upload.fileName}`}
+                          title={`Delete ${upload.fileName}`}
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -271,7 +288,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
               <div>
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Revenue trend</h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">
-                  Revenue trend across the selected date range.
+                  Six-month revenue window. Use the date filter to move across the full CSV date range.
                 </p>
               </div>
             </div>

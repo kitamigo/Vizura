@@ -74,6 +74,11 @@ export default function Rostering() {
   const [shiftFormError, setShiftFormError] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    return () => {
+      delete window.__vizuraDraggingShiftId
+    }
+  }, [])
   const [shiftForm, setShiftForm] = useState({
     date: dateValue(new Date()),
     startTime: '09:00',
@@ -230,6 +235,64 @@ export default function Rostering() {
   const onEmployeeDragStart = (event, employeeId) => {
     event.dataTransfer.effectAllowed = 'copy'
     event.dataTransfer.setData('application/vizura-employee', String(employeeId))
+    event.dataTransfer.setData('text/plain', `employee:${employeeId}`)
+  }
+
+  const onShiftDragStart = (event, shiftId) => {
+    event.stopPropagation()
+    window.__vizuraDraggingShiftId = Number(shiftId) || shiftId
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('application/vizura-shift', String(shiftId))
+    event.dataTransfer.setData('text/plain', `shift:${shiftId}`)
+  }
+
+  useEffect(() => {
+    const finishNativeDrag = (event) => {
+      const shiftId = window.__vizuraDraggingShiftId
+      if (!shiftId) return
+      const target = document.elementFromPoint(event.clientX, event.clientY)
+      if (target?.closest('[data-roster-trash-target]')) {
+        deleteShift(shiftId, false)
+      }
+      delete window.__vizuraDraggingShiftId
+    }
+    const finishMouseDrag = (event) => {
+      const shiftId = window.__vizuraDraggingShiftId
+      if (!shiftId) return
+      const target = document.elementFromPoint(event.clientX, event.clientY)
+      if (target?.closest('[data-roster-trash-target]')) {
+        deleteShift(shiftId, false)
+      }
+      delete window.__vizuraDraggingShiftId
+    }
+    window.addEventListener('dragend', finishNativeDrag)
+    window.addEventListener('mouseup', finishMouseDrag)
+    return () => {
+      window.removeEventListener('dragend', finishNativeDrag)
+      window.removeEventListener('mouseup', finishMouseDrag)
+    }
+  }, [shifts, employees])
+
+  const deleteShift = (shiftId, confirmDelete = true) => {
+    const shift = shifts.find((item) => employeeKey(item.Id) === employeeKey(shiftId))
+    if (!shift) return
+    const employee = employees.find((item) => employeeKey(item.id) === employeeKey(shift.EmployeeId))
+    const shiftLabel = employee?.name
+      ? `${employee.name} shift`
+      : 'This shift'
+    if (confirmDelete && !window.confirm(`Delete ${shiftLabel}? This cannot be undone.`)) return
+    setShifts((current) => current.filter((item) => employeeKey(item.Id) !== employeeKey(shiftId)))
+    setSelectedShift(null)
+    setError('')
+  }
+
+  const onDeleteDrop = (event) => {
+    event.preventDefault()
+    const shiftId = event.dataTransfer.getData('application/vizura-shift')
+      || String(event.dataTransfer.getData('text/plain')).replace(/^shift:/, '')
+    if (shiftId && !String(shiftId).includes('employee')) deleteShift(shiftId, false)
+    else if (window.__vizuraDraggingShiftId) deleteShift(window.__vizuraDraggingShiftId, false)
+    delete window.__vizuraDraggingShiftId
   }
 
   const onCalendarDrop = (event) => {
@@ -330,9 +393,24 @@ export default function Rostering() {
             <div className="roster-calendar-header">
               <div>
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Shift schedule</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Click a date to open the day view.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Click a date to open the day view. Drag a shift here to delete it.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-roster-trash-target
+                  className="roster-trash-button"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={onDeleteDrop}
+                  onClick={() => {
+                    if (selectedShift) deleteShift(selectedShift.Id)
+                  }}
+                  disabled={!selectedShift}
+                  aria-label="Delete selected or dragged shift"
+                  title="Drag a shift here or select a shift and click to delete"
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
                 {isDayView && (
                   <button type="button" onClick={() => setIsDayView(false)} className="roster-secondary-button">Back to week</button>
                 )}
@@ -355,6 +433,8 @@ export default function Rostering() {
                   selectedEmployeeId={selectedEmployeeId}
                   onUpdatePeriod={updatePeriod}
                   onHourDrop={onDayHourDrop}
+                  onShiftDragStart={onShiftDragStart}
+                  onDeleteShift={deleteShift}
                   onOpenShift={(shiftId) => setSelectedShift(shifts.find((shift) => shift.Id === shiftId) || null)}
                 />
               ) : (
@@ -369,7 +449,7 @@ export default function Rostering() {
                   timeScale={{ enable: false }}
                   showQuickInfo={false}
                   rowAutoHeight
-                  allowDragAndDrop
+                  allowDragAndDrop={false}
                   allowResizing
                   dateHeaderTemplate={(props) => (
                     <button type="button" className="roster-date-header" onClick={() => openDayView(props.date)}>
@@ -402,6 +482,11 @@ export default function Rostering() {
                   }}
                   eventRendered={(args) => {
                     args.element.dataset.rosterShiftId = String(args.data.Id)
+                    args.element.draggable = true
+                    args.element.onmousedown = () => {
+                      window.__vizuraDraggingShiftId = args.data.Id
+                    }
+                    args.element.ondragstart = (event) => onShiftDragStart(event, args.data.Id)
                     const unallocated = !args.data.EmployeeId
                     args.element.style.backgroundColor = unallocated ? '#fef3c7' : (args.data.IsPublished ? '#2563eb' : '#dbeafe')
                     args.element.style.color = unallocated ? '#92400e' : (args.data.IsPublished ? '#fff' : '#1e3a8a')
@@ -474,6 +559,7 @@ export default function Rostering() {
         shift={selectedShift}
         employees={employees}
         onClose={() => setSelectedShift(null)}
+        onDelete={deleteShift}
       />
     </div>
   )
