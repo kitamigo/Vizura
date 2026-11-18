@@ -595,6 +595,21 @@ async function uploadCsv(req, res) {
   const csvContent = req.file.buffer.toString('utf8')
   const dataPoints = parseCsvToDataPoints(csvContent)
 
+  await ensureUploadTable()
+  const duplicateName = await db.query(
+    `SELECT id FROM analytics_uploads
+     WHERE LOWER(BTRIM(file_name)) = LOWER(BTRIM($1))
+        OR csv_content = $2
+     LIMIT 1`,
+    [fileName, csvContent],
+  )
+  if (duplicateName.rows.length) {
+    return res.status(409).json({
+      error: 'This CSV has already been uploaded. Choose a different file or select the existing CSV.',
+      duplicateFileName: fileName,
+    })
+  }
+
   latestCsvContent = csvContent
   latestUpload = { fileName, uploadedAt }
   latestDataPoints = dataPoints

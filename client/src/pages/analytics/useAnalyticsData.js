@@ -35,6 +35,7 @@ function zipForecastPoints(forecast) {
   if (!Array.isArray(forecast?.dates)) return []
 
   return forecast.dates.map((date, i) => ({
+    date,
     predicted_revenue: forecast.ensemble_forecast?.[i] ?? forecast.xgboost_forecast?.[i] ?? 0,
     yhat_lower: forecast.lower_bound?.[i] ?? 0,
     yhat_upper: forecast.upper_bound?.[i] ?? 0,
@@ -242,6 +243,15 @@ export function useAnalyticsData(dateRange) {
       return
     }
 
+    const normalizedName = file.name.trim().toLowerCase()
+    const duplicate = uploadedCsvs.find((upload) =>
+      String(upload.fileName || '').trim().toLowerCase() === normalizedName,
+    )
+    if (duplicate) {
+      setErrorMsg(`A CSV named "${file.name}" has already been uploaded. Select the existing saved CSV instead.`)
+      return
+    }
+
     setLoadingUpload(true)
     startAction()
 
@@ -255,6 +265,7 @@ export function useAnalyticsData(dateRange) {
       setUploadedFileName(norm.fileName || file.name)
       setStatusMsg(res.message || 'CSV uploaded successfully. Model output received.')
       setCsvFile(null)
+      window.dispatchEvent(new Event('vizura-analytics-changed'))
 
       // upload still succeeds if these refreshes fail
       try {
@@ -330,6 +341,7 @@ export function useAnalyticsData(dateRange) {
       setUploadedFileName(norm.fileName || '')
       setUploadedCsvs((current) => current.map((u) => ({ ...u, isActive: u.id === id })))
       setStatusMsg(`${norm.fileName || 'Uploaded CSV'} activated.`)
+      window.dispatchEvent(new Event('vizura-analytics-changed'))
 
       await refreshRevenueTrend()
     } catch (error) {
@@ -369,6 +381,7 @@ export function useAnalyticsData(dateRange) {
       setUploadedCsvs((current) => current.filter((u) => u.id !== deleteTarget.id))
       setStatusMsg(`${deleteTarget.fileName} deleted.`)
       setCustomEvents([])
+      window.dispatchEvent(new Event('vizura-analytics-changed'))
     } catch (error) {
       setErrorMsg(getApiError(error, 'Could not delete the CSV.', ['message']))
     } finally {

@@ -49,7 +49,7 @@ export function ForecastTrendChart({ data }) {
           fill="url(#trend-fill)"
           stroke="none"
         />
-        <polyline points={linePts} fill="none" stroke="#0369a1" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={linePts} fill="none" stroke="#0369a1" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" className="dark:stroke-sky-300" />
 
         {data.map((item, index) => (
           <g key={item.date} className="group">
@@ -57,8 +57,7 @@ export function ForecastTrendChart({ data }) {
               cx={scaleX(index)}
               cy={scaleY(item.revenue)}
               r={selected?.date === item.date ? 6 : 4}
-              fill={selected?.date === item.date ? '#0369a1' : '#0f172a'}
-              className="cursor-pointer dark:fill-white"
+              className="cursor-pointer fill-[#0369a1] dark:fill-sky-300"
               onClick={() => setSelected(item)}
             >
               <title>{`${formatDDMMYY(item.date)}: $${item.revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</title>
@@ -123,7 +122,7 @@ export function ForecastBandChart({ data }) {
     .join(' ')
   const linePts = data.map((item, index) => `${scaleX(index)},${scaleY(item.predicted_revenue)}`).join(' ')
 
-const yTicks = getNiceTicks(min, max)
+  const yTicks = getNiceTicks(min, max)
   const labelEvery = Math.max(1, Math.ceil(data.length / 8))
 
   return (
@@ -145,11 +144,11 @@ const yTicks = getNiceTicks(min, max)
       ))}
 
       <polyline points={`${upperPts} ${lowerPts}`} fill="url(#forecast-band)" stroke="none" />
-      <polyline points={linePts} fill="none" stroke="#0284c7" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={linePts} fill="none" stroke="#1e3a8a" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" className="dark:stroke-sky-300" />
 
       {data.map((item, index) => (
         <g key={item.date}>
-          <circle cx={scaleX(index)} cy={scaleY(item.predicted_revenue)} r="4" fill="#0f172a" className="cursor-pointer dark:fill-white">
+          <circle cx={scaleX(index)} cy={scaleY(item.predicted_revenue)} r="4" className="cursor-pointer fill-[#1e3a8a] dark:fill-sky-300">
             <title>{`${formatDDMMYY(item.date)}: $${item.predicted_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })} (range $${Math.round(item.yhat_lower).toLocaleString()}–$${Math.round(item.yhat_upper).toLocaleString()})`}</title>
           </circle>
           {index % labelEvery === 0 && (

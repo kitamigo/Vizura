@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import DatePicker from '../../components/ui/DateRangePicker'
 import { Button } from 'flowbite-react'
 import { AnalyticsNlqPanel } from './AnalyticsNlqPanel'
@@ -72,6 +72,16 @@ function AnalyticsShell({ dateRange, setDateRange }) {
     availableDates.start && availableDates.end
       ? `${formatDDMMYY(availableDates.start.toISOString().split('T')[0])} - ${formatDDMMYY(availableDates.end.toISOString().split('T')[0])}`
       : null
+
+  useEffect(() => {
+    if (!availableDates.start || !availableDates.end) return
+    if (dateRange.startDate || dateRange.endDate) return
+
+    const start = new Date(availableDates.end)
+    start.setMonth(start.getMonth() - 6)
+    if (start < availableDates.start) start.setTime(availableDates.start.getTime())
+    setDateRange({ startDate: start, endDate: availableDates.end })
+  }, [availableDates.start, availableDates.end, dateRange.startDate, dateRange.endDate, setDateRange])
 
   const prompts = useMemo(
     () => [

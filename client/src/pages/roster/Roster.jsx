@@ -115,14 +115,15 @@ export default function Rostering() {
 
   useEffect(() => writeDemoShifts(shifts), [shifts])
   useEffect(() => {
-    const refreshShifts = () => setShifts(readDemoShifts())
-    window.addEventListener('storage', refreshShifts)
-    window.addEventListener('vizura-demo-roster-changed', refreshShifts)
-    return () => {
-      window.removeEventListener('storage', refreshShifts)
-      window.removeEventListener('vizura-demo-roster-changed', refreshShifts)
-    }
-  }, [])
+    const refreshScheduler = window.requestAnimationFrame(() => {
+      if (typeof scheduler.current?.refreshEvents === 'function') {
+        scheduler.current.refreshEvents()
+      } else if (typeof scheduler.current?.dataBind === 'function') {
+        scheduler.current.dataBind()
+      }
+    })
+    return () => window.cancelAnimationFrame(refreshScheduler)
+  }, [shifts])
   useEffect(() => localStorage.setItem('vizura-roster-day-periods', JSON.stringify(dayPeriods)), [dayPeriods])
 
   const hoursByEmployee = useMemo(() => {
@@ -200,7 +201,7 @@ export default function Rostering() {
         Section: shiftForm.section,
         StartTime: shiftedStart,
         EndTime: shiftedEnd,
-        EmployeeId: shiftForm.employeeId ? Number(shiftForm.employeeId) : null,
+        EmployeeId: shiftForm.employeeId || null,
         RosterId: 1,
         IsPublished: false,
       })
@@ -217,7 +218,12 @@ export default function Rostering() {
     }
     if (shifts.some((shift) => !shift.EmployeeId) && !window.confirm('Some shifts do not have an employee assigned. Publish anyway?')) return
     setBusy(true)
-    setShifts((current) => current.map((shift) => ({ ...shift, IsPublished: true })))
+    setShifts((current) => current.map((shift) => {
+      const shiftDate = new Date(shift.StartTime)
+      return shiftDate >= range.start && shiftDate <= range.end
+        ? { ...shift, IsPublished: true }
+        : shift
+    }))
     setBusy(false)
   }
 
@@ -228,7 +234,7 @@ export default function Rostering() {
 
   const onCalendarDrop = (event) => {
     event.preventDefault()
-    const employeeId = Number(event.dataTransfer.getData('application/vizura-employee'))
+    const employeeId = event.dataTransfer.getData('application/vizura-employee')
     if (!employeeId) return
 
     const appointment = event.target.closest?.('[data-roster-shift-id]')
@@ -255,7 +261,7 @@ export default function Rostering() {
 
   const onDayHourDrop = (event, hour) => {
     event.preventDefault()
-    const employeeId = Number(event.dataTransfer.getData('application/vizura-employee'))
+    const employeeId = event.dataTransfer.getData('application/vizura-employee')
     if (!employeeId) return
     setPendingEmployeeShift({
       employeeId,

@@ -48,34 +48,65 @@ function EmployerDashboard() {
     }
   }, [])
   useEffect(() => {
-    fetchRevenueTrend({}).then((res) => setRevenuePoints(res?.points || [])).catch(() => setRevenuePoints([]))
-    fetchSavedForecast().then((res) => {
-      const forecast = res?.forecast
-      if (Array.isArray(forecast)) setForecastPoints(forecast)
-      else if (Array.isArray(forecast?.dates)) {
-        setForecastPoints(forecast.dates.map((date, index) => ({
-          date,
-          predicted_revenue: forecast.ensemble_forecast?.[index] ?? 0,
-        })))
-      } else setForecastPoints([])
-    }).catch(() => setForecastPoints([]))
+    const refreshAnalytics = () => {
+      fetchRevenueTrend({}).then((res) => setRevenuePoints(res?.points || [])).catch(() => setRevenuePoints([]))
+      fetchSavedForecast().then((res) => {
+        const forecast = res?.forecast
+        if (Array.isArray(forecast)) setForecastPoints(forecast)
+        else if (Array.isArray(forecast?.dates)) {
+          setForecastPoints(forecast.dates.map((date, index) => ({
+            date,
+            predicted_revenue: forecast.ensemble_forecast?.[index] ?? 0,
+          })))
+        } else setForecastPoints([])
+      }).catch(() => setForecastPoints([]))
+    }
+    refreshAnalytics()
     getPayRuns().then((runs) => setLatestPayRun(runs[0] || null)).catch(() => setLatestPayRun(null))
+    window.addEventListener('vizura-analytics-changed', refreshAnalytics)
+    window.addEventListener('storage', refreshAnalytics)
+    return () => {
+      window.removeEventListener('vizura-analytics-changed', refreshAnalytics)
+      window.removeEventListener('storage', refreshAnalytics)
+    }
   }, [])
   {/* formats the shift for a given day offset (0 = Monday, 6 = Sunday) */}
   const formatShift = (dayOffset, employeeId) => {
     const matching = shifts.filter((item) => {
       const shiftDate = new Date(item.StartTime)
       const difference = Math.round((shiftDate - weekStart) / (24 * 60 * 60 * 1000))
-      return difference === dayOffset && String(item.EmployeeId) === String(employeeId) && item.IsPublished
+      return difference === dayOffset && String(item.EmployeeId) === String(employeeId)
     })
     if (!matching.length) return '—'
     const formatHour = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     return matching.map((shift) => `${formatHour(new Date(shift.StartTime))}-${formatHour(new Date(shift.EndTime))}`).join(', ')
   }
   {/* generates the table rows for the roster table */}
-  const tableRows = employees.map((employee) => [
-    `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || 'Unnamed employee',
-    employee.category || employee.employmentType || 'Employee',
+  const rosterEmployees = useMemo(() => {
+    const merged = new Map()
+    employees.forEach((employee) => merged.set(String(employee.id), {
+      id: employee.id,
+      name: `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || 'Unnamed employee',
+      role: employee.category || employee.employmentType || 'Employee',
+      hourlyRate: Number(employee.hourlyRate || 0),
+    }))
+    shifts.forEach((shift) => {
+      const key = String(shift.EmployeeId ?? '')
+      if (key && !merged.has(key)) {
+        merged.set(key, {
+          id: shift.EmployeeId,
+          name: 'Assigned employee',
+          role: 'Employee',
+          hourlyRate: 0,
+        })
+      }
+    })
+    return [...merged.values()]
+  }, [employees, shifts])
+
+  const tableRows = rosterEmployees.map((employee) => [
+    employee.name,
+    employee.role,
     ...Array.from({ length: 7 }, (_, index) => formatShift(index, employee.id)),
   ])
 
@@ -87,7 +118,7 @@ function EmployerDashboard() {
   }, [weekStart])
   const publishedWeekShifts = shifts.filter((shift) => {
     const date = new Date(shift.StartTime)
-    return shift.IsPublished && date >= weekStart && date <= weekEnd
+    return date >= weekStart && date <= weekEnd
   })
   const scheduledHours = publishedWeekShifts.reduce((total, shift) =>
     total + (new Date(shift.EndTime) - new Date(shift.StartTime)) / 36e5, 0)
@@ -96,11 +127,34 @@ function EmployerDashboard() {
     const hours = (new Date(shift.EndTime) - new Date(shift.StartTime)) / 36e5
     return total + hours * Number(employee?.hourlyRate || 0)
   }, 0)
-  const latestRevenue = revenuePoints.slice(-5)
+  const latestRevenue = useMemo(() => {
+    if (!revenuePoints.length) return []
+    const sorted = [...revenuePoints].sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    const lastDate = new Date(`${sorted[sorted.length - 1].date}T00:00:00`)
+    if (Number.isNaN(lastDate.getTime())) return sorted.slice(-6)
+    const start = new Date(lastDate)
+    start.setMonth(start.getMonth() - 5)
+    start.setDate(1)
+
+    const byMonth = new Map()
+    sorted.forEach((point) => {
+      const date = new Date(`${point.date}T00:00:00`)
+      if (Number.isNaN(date.getTime()) || date < start || date > lastDate) return
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      byMonth.set(key, (byMonth.get(key) || 0) + Number(point.revenue || 0))
+    })
+    return [...byMonth.entries()].map(([key, revenue]) => ({
+      date: `${key}-01`,
+      revenue,
+    }))
+  }, [revenuePoints])
   const revenueBars = latestRevenue.length
     ? latestRevenue.map((point) => Number(point.revenue || 0))
     : []
   const maxRevenue = Math.max(...revenueBars, 1)
+  const dashboardForecast = forecastPoints.length
+    ? [...forecastPoints].filter((point, index) => index === 0 || (index + 1) % Math.max(1, Math.ceil(forecastPoints.length / 6)) === 0).slice(0, 6)
+    : []
 
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
@@ -111,7 +165,7 @@ function EmployerDashboard() {
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Roster this week</h2>
-                <p className="text-xs text-slate-500 dark:text-sky-100/70">{employees.length} employees · Published shifts only</p>
+                <p className="text-xs text-slate-500 dark:text-sky-100/70">{rosterEmployees.length} employees · Live scheduled shifts</p>
               </div>
               <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-300/15 dark:text-emerald-200">
                 Live
@@ -174,13 +228,15 @@ function EmployerDashboard() {
                 {[1, 2, 3, 4].map((line) => <span key={line} className="border-t border-sky-100 dark:border-white/10" />)}
               </div>
               <div className="absolute bottom-3 left-3 right-3 flex h-20 items-end gap-3">
-                {(forecastPoints.length ? forecastPoints.slice(-4) : [{}, {}, {}, {}]).map((point, index) => (
-                  <div key={point.date || index} className="flex-1 rounded-t-full bg-gradient-to-t from-sky-500 to-cyan-300" style={{ height: `${forecastPoints.length ? 25 + (index * 8) : 20}%` }} />
+                {(dashboardForecast.length ? dashboardForecast : [{}, {}, {}, {}, {}, {}]).map((point, index) => (
+                  <div key={point.date || index} className="flex-1 rounded-t-full bg-gradient-to-t from-sky-500 to-cyan-300" style={{ height: `${dashboardForecast.length ? 20 + (index * 10) : 20}%` }} />
                 ))}
               </div>
             </div>
             <div className="mt-3 flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
-              <span>Week 1</span><span>Week 2</span><span>Week 3</span><span>Week 4</span>
+              {(dashboardForecast.length ? dashboardForecast : [{}, {}, {}, {}, {}, {}]).map((point, index) =>
+                <span key={point.date || index}>{point.date ? point.date.slice(5) : `M${index + 1}`}</span>,
+              )}
             </div>
             <p className="mt-3 text-right text-xs font-semibold text-sky-600 dark:text-sky-200">{forecastPoints.length ? 'Live forecast' : 'Awaiting CSV'}</p>
           </article>
