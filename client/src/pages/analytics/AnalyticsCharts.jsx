@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatDDMMYY } from './analyticsUtils'
 
-export function ForecastTrendChart({ data }) {
+export function ForecastTrendChart({ data, compact = false }) {
   const [selected, setSelected] = useState(null)
 
   if (!data.length) {
@@ -27,7 +27,7 @@ export function ForecastTrendChart({ data }) {
       <div className="mb-2 h-6 text-sm font-medium text-slate-700 dark:text-slate-200">
         {selected ? `${formatDDMMYY(selected.date)} — $${selected.revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'Click a point to see its value'}
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className={`${compact ? 'h-44' : 'h-64'} w-full`}>
         <defs>
           <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.25" />
@@ -97,7 +97,7 @@ function getNiceTicks(min, max, tickCount = 4) {
   return ticks
 }
 
-export function ForecastBandChart({ data }) {
+export function ForecastBandChart({ data, compact = false }) {
   const normalized = data
     .filter((item) => item && Number.isFinite(Number(item.predicted_revenue)))
     .map((item) => ({
@@ -135,7 +135,7 @@ export function ForecastBandChart({ data }) {
   const labelEvery = Math.max(1, Math.ceil(normalized.length / 8))
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full">
+    <svg viewBox={`0 0 ${width} ${height}`} className={`${compact ? 'h-44' : 'h-64'} w-full`}>
       <defs>
         <linearGradient id="forecast-band" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />

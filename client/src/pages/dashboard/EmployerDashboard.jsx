@@ -8,7 +8,7 @@ import { getPayRuns } from '../../services/payrollApi'
 import { ForecastBandChart, ForecastTrendChart } from '../analytics/AnalyticsCharts'
 {/* EmployerDashboard */}
 function EmployerDashboard() {
-  const panelClass = 'rounded-xl border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/30 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-none'
+  const panelClass = 'flex min-h-0 flex-col rounded-xl border border-sky-200/80 bg-white/80 p-3 shadow-lg shadow-sky-200/30 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-none'
   const [shifts, setShifts] = useState(readDemoShifts)
   const [employees, setEmployees] = useState([])
   const [revenuePoints, setRevenuePoints] = useState([])
@@ -157,10 +157,10 @@ function EmployerDashboard() {
   const dashboardForecast = forecastPoints
 
   return (
-    <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
-      <div className="mx-auto max-w-[1600px] space-y-5">
+    <div className="relative h-[calc(100vh-5.25rem)] min-h-[560px] overflow-hidden px-4 pb-3 pt-1 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
+      <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-3">
         {/* Roster and payroll section */}
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
+        <section className="grid min-h-[210px] flex-[0.75] gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
           <article className={panelClass}>
             <div className="mb-4 flex items-start justify-between">
               <div>
@@ -219,20 +219,20 @@ function EmployerDashboard() {
           </article>
         </section>
         {/* Charts section */}
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section className="grid min-h-[300px] flex-1 gap-3 lg:grid-cols-2">
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Forecast chart</h2>
             <p className="text-xs text-slate-500 dark:text-sky-100/70">Projected revenue (next 6 months)</p>
-            <div className="mt-4 rounded-lg border border-sky-100 bg-slate-50 p-2 dark:border-white/10 dark:bg-slate-950/40">
-              <ForecastBandChart data={dashboardForecast} />
+            <div className="mt-2 flex-1 rounded-lg border border-sky-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/40">
+              <ForecastBandChart data={dashboardForecast} compact />
             </div>
           </article>
           {/* Revenue chart panel */}
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Revenue chart</h2>
             <p className="text-xs text-slate-500 dark:text-sky-100/70">Revenue trend (latest six months)</p>
-            <div className="mt-4 rounded-lg border border-sky-100 bg-slate-50 p-2 dark:border-white/10 dark:bg-slate-950/40">
-              <ForecastTrendChart data={latestRevenue} />
+            <div className="mt-2 flex-1 rounded-lg border border-sky-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/40">
+              <ForecastTrendChart data={latestRevenue} compact />
             </div>
           </article>
         </section>
