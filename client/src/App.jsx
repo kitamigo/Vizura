@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import MainLayout from './components/layout/MainLayout.jsx'
 import Header from './components/layout/Header.jsx'
@@ -15,19 +15,21 @@ import Register from './pages/auth/Register.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 
 const pageTitles = {
-  '/login': 'Log in',
-  '/register': 'Create account',
-  '/app/dashboard': 'Dashboard',
-  '/app/analytics': 'Analytics',
-  '/app/payroll': 'Payroll',
-  '/app/roster': 'Roster',
-  '/app/employees': 'Staff management',
-  '/app/settings': 'Settings',
+  '/login': 'LOG IN',
+  '/register': 'CREATE ACCOUNT',
+  '/app/dashboard': 'MISSION CONTROL',
+  '/app/analytics': 'INSIGHTS',
+  '/app/payroll': 'LABOUR & COST',
+  '/app/roster': 'SHIFT PLANNER',
+  '/app/employees': 'EMPLOYEE MANAGEMENT',
+  '/app/settings': 'WORKSPACE SETTINGS',
 }
 
 function App() {
   const { pathname } = useLocation()
   const isAuthPage = pathname === '/login' || pathname === '/register'
+  // shared so the header can follow the sidebar's width
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   useEffect(() => {
     document.title = `Vizura - ${pageTitles[pathname] || 'Page'}`
@@ -35,7 +37,7 @@ function App() {
 
   return (
     <>
-      {!isAuthPage && <Header />}
+      {!isAuthPage && <Header sidebarCollapsed={sidebarCollapsed} title={pageTitles[pathname]} />}
 
       <Routes>
 
@@ -46,7 +48,15 @@ function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* App shell */}
-        <Route path="/app" element={<MainLayout />}>
+        <Route
+          path="/app"
+          element={
+            <MainLayout
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            />
+          }
+        >
 
           <Route
             path="dashboard"

@@ -48,11 +48,6 @@ function EmployerDashboard() {
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <section className="px-0 pb-4">
-          <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
-            Dashboard
-          </h1>
-        </section>
         {/* Roster and payroll section */}
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
           <article className={panelClass}>

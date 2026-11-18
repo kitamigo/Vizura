@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
-import logoDark from '../../assets/logo_dark.svg'
-import logoLight from '../../assets/logo_light.svg'
 import toggleDarkIcon from '../../assets/toggle_dark_mode.svg'
 import toggleLightIcon from '../../assets/toggle_light_mode.svg'
 
-function Header() {
+function Header({ sidebarCollapsed, title }) {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -28,23 +26,21 @@ function Header() {
     window.localStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
   }, [isDarkMode])
 
-  const logo = isDarkMode ? logoLight : logoDark
   const toggleIcon = isDarkMode ? toggleLightIcon : toggleDarkIcon
 
   return (
     <header
       className={`
-        fixed top-0 left-0 w-full h-14
-        bg-sky-200 text-slate-900 dark:bg-slate-900 dark:text-slate-100
-        border-b border-sky-200 dark:border-slate-800
-        flex items-center justify-between px-6 z-50
-        transition-colors duration-200
+        fixed top-0 right-0 h-14 ${sidebarCollapsed ? 'left-16' : 'left-64'}
+        bg-sky-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100
+        flex items-center justify-between px-12 sm:px-12 lg:px-14 z-50
+        transition-[left,background-color,color] duration-300 ease-in-out
       `}
     >
 
-      <div className="flex w-64 items-center justify-center">
-        <img src={logo} alt="Vizura" className="h-[38px] w-40" />
-      </div>
+      <h1 className="truncate text-xl font-bold tracking-wide text-sky-600 dark:text-sky-300">
+        {title}
+      </h1>
 
       <div className="flex items-center">
         <button
@@ -58,7 +54,7 @@ function Header() {
             src={toggleIcon}
             alt=""
             aria-hidden="true"
-            className="h-12 w-12 cursor-pointer"
+            className="h-9 w-9 cursor-pointer"
           />
         </button>
       </div>
