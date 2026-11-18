@@ -133,7 +133,7 @@ function Payroll() {
   })
 
   return (
-    <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-2 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
+    <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-0 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="mx-auto max-w-[1600px] space-y-6">
         <section className="flex flex-col gap-4 pb-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3">

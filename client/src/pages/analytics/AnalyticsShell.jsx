@@ -97,7 +97,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
   )
 
   return (
-    <div className="relative min-h-full overflow-x-hidden px-4 pt-2 pb-4 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
+    <div className="relative min-h-full overflow-x-hidden px-4 pt-0 pb-4 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="relative z-10 space-y-6">
         <section className="grid gap-4 lg:grid-cols-3">
           <article className="relative z-50 overflow-visible rounded-[26px] border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none">

@@ -157,7 +157,7 @@ function EmployerDashboard() {
   const dashboardForecast = forecastPoints
 
   return (
-    <div className="relative h-[calc(100vh-5.25rem)] min-h-[560px] overflow-hidden px-4 pb-3 pt-1 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
+    <div className="relative h-[calc(100vh-5rem)] min-h-[560px] overflow-hidden px-4 pb-3 pt-0 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-3">
         {/* Roster and payroll section */}
         <section className="grid min-h-[210px] flex-[0.75] gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.8fr)]">
