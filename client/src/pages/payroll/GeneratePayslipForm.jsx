@@ -64,6 +64,7 @@ function getRosterShifts(employeeId, start, end) {
 
   return readDemoShifts()
     .filter((shift) => shift.IsPublished)
+    .filter((shift) => Boolean(shift.EmployeeId))
     .filter((shift) => String(shift.EmployeeId) === String(employeeId))
     .filter((shift) => new Date(shift.StartTime) >= startDate)
     .filter((shift) => new Date(shift.StartTime) <= endDate)
@@ -236,6 +237,7 @@ function GeneratePayslipForm({ payPeriodStart: externalStart, payPeriodEnd: exte
     const end = form.payPeriodEnd ? new Date(`${form.payPeriodEnd}T23:59:59`) : null
     return readDemoShifts().some((shift) => {
       if (!shift.IsPublished) return false
+      if (!shift.EmployeeId) return false
       if (String(shift.EmployeeId) !== String(employee.id)) return false
       const shiftDate = new Date(shift.StartTime)
       return (!start || shiftDate >= start) && (!end || shiftDate <= end)

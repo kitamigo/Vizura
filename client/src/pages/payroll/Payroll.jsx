@@ -77,9 +77,6 @@ function Payroll() {
       .then((runs) => {
         if (active) {
           setPayRuns(runs)
-          const current = getCurrentWeek()
-          setPayPeriodStart(current.start)
-          setPayPeriodEnd(current.end)
         }
       })
       .catch((err) => {
@@ -104,6 +101,7 @@ function Payroll() {
   const periodEnd = payPeriodEnd ? new Date(`${payPeriodEnd}T23:59:59`) : null
   const publishedShifts = rosterShifts.filter((shift) => {
     if (!shift.IsPublished) return false
+    if (!shift.EmployeeId) return false
     const date = new Date(shift.StartTime)
     return (!periodStart || date >= periodStart) && (!periodEnd || date <= periodEnd)
   })

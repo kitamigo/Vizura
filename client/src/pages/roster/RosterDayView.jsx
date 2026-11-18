@@ -109,7 +109,7 @@ export default function RosterDayView({
                           }}
                         >
                           {shift.Section && <strong>{shift.Section}</strong>}
-                          <span>{employee?.name || 'Assign employee'}</span>
+                          <span>{employee?.name || 'Fill shift'}</span>
                           <small>
                             {new Date(shift.StartTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} -{' '}
                             {new Date(shift.EndTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}

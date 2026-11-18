@@ -209,9 +209,9 @@ export function AddShiftModal({
           <span>Allocate person</span>
           <RosterDropdown
             value={form.employeeId}
-            placeholder="Assign later"
+            placeholder="Fill shift"
             options={[
-              { value: '', label: 'Assign later' },
+              { value: '', label: 'Fill shift' },
               ...employees.map((employee) => ({ value: String(employee.id), label: employee.name })),
             ]}
             onChange={(value) => onChange('employeeId')({ target: { value } })}
@@ -245,7 +245,7 @@ export function ShiftDetailsModal({ shift, employees, onClose, onDelete }) {
             {shift.EndTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </dd>
         </div>
-        <div><dt>Employee</dt><dd>{employee?.name || 'Unassigned'}</dd></div>
+        <div><dt>Employee</dt><dd>{employee?.name || 'Fill shift'}</dd></div>
         <div><dt>Status</dt><dd>{shift.IsPublished ? 'Published' : 'Draft'}</dd></div>
       </dl>
       <div className="roster-modal-actions">

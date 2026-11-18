@@ -465,7 +465,7 @@ export default function Rostering() {
                           {props.Section && <strong className="block truncate">{props.Section}</strong>}
                           {employee?.name
                             ? <strong className="block truncate">{employee.name}</strong>
-                            : <strong className="roster-assign-label">Assign employee</strong>}
+                            : <strong className="roster-assign-label">Fill shift</strong>}
                           <span>
                             {props.StartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} -{' '}
                             {props.EndTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -495,7 +495,7 @@ export default function Rostering() {
                   actionComplete={(args) => {
                     if (args.requestType === 'dateNavigate' || args.requestType === 'viewNavigate') {
                       const dates = scheduler.current?.getCurrentViewDates() || []
-                      if (dates.length) {
+                      if (dates.length && args.requestType !== 'dateNavigate' && scheduler.current?.currentView !== 'Day') {
                         const start = new Date(dates[0])
                         start.setHours(0, 0, 0, 0)
                         const end = new Date(dates[dates.length - 1])
