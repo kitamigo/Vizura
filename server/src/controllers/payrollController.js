@@ -78,28 +78,16 @@ async function createPayRun(req, res) {
         s => String(s.employee_id) === String(emp.employee_id)
       );
 
-      // Calculates hours and detects public holidays from shifts //
-      let regularHours = 0;
-      let overtimeHours = 0;
-      const publicHolidays = [];
+      // calculates hours and detects public holidays from shifts
+      const { regularHours, publicHolidays } =
+        calculateShiftHours(empShifts, region)
 
-      for (const shift of empShifts) {
-        const dateStr = new Date(shift.date).toISOString().split('T')[0];
-        const hours = parseFloat(shift.hours_worked) || 0;
-
-        if (isPublicHoliday(dateStr, region)) {
-          publicHolidays.push({ date: dateStr, hoursWorked: hours, worked: true });
-        } else {
-          // no OT in NZ unless stated in employment contract
-          regularHours += hours;
-        }
-      }
-
-            // Builds objects in the shape the engine expects 
+      // builds the employee and pay period objects for the payroll engine
       const engineEmployee = {
         hourlyRate: parseFloat(emp.hourly_rate),
-        employmentType: emp.contract_type,
+        employmentType: normalizeEmploymentType(emp.contract_type),
         wageType: 'adult',
+        // TEMP PLACEHOLDERS
         usualDaysPerWeek: 5,
         taxCode: emp.tax_code || 'M',
         kiwisaverRate: emp.kiwisaver_rate != null ? parseFloat(emp.kiwisaver_rate) : null,
@@ -110,6 +98,7 @@ async function createPayRun(req, res) {
         overtimeHours: 0,
         publicHolidays,
         leaveDaysTaken: 0,
+        // TEMP PLACEHOLDERS
         owp: parseFloat(emp.hourly_rate) * 40,
         awe: parseFloat(emp.hourly_rate) * 40,
       };
@@ -129,7 +118,7 @@ async function createPayRun(req, res) {
         ytdKiwiSaver = parseFloat(ytdResult.rows[0].ytd_kiwisaver) || 0;
       }
 
-      // Wage error handling
+      // wage error handling
       let result;
       try {
         result = calcPayRun(engineEmployee, enginePayPeriod, { ytdGross, ytdPAYE, ytdKiwiSaver });
@@ -185,7 +174,7 @@ async function createPayRun(req, res) {
   }
 }
 
-// DOWNLOAD PAYSLIP PDF //
+// - Download Payslip PDF - //
 async function downloadPayslipPDF(req, res) {
   try {
     const { id } = req.params;
@@ -201,7 +190,7 @@ async function downloadPayslipPDF(req, res) {
        JOIN users u ON e.user_id = u.user_id
        JOIN businesses b ON p.business_id = b.business_id
        WHERE p.payslip_id = $1`,
-      [id]
+      [parsedId]
     );
 
     if (!result.rows.length) {
@@ -210,13 +199,12 @@ async function downloadPayslipPDF(req, res) {
 
     const slip = result.rows[0];
 
-    // Authorization (only the employee/manager can view) 
-    const isOwner = req.user.user_id === slip.employee_user_id;
-    const isManager = req.user.user_id === slip.manager_user_id;
+    // authorization - only the employee or manager can view
+    const isOwner = Number(req.user.user_id) === Number(slip.employee_user_id);
+    const isManager = Number(req.user.user_id) === Number(slip.manager_user_id);
     if (!isOwner && !isManager) {
       return res.status(403).json({ error: 'Not authorized to view this payslip' });
     }
-
     const breakdown = slip.breakdown || {};
     const grossPay = parseFloat(slip.gross_pay);
     const payeTax = parseFloat(slip.paye_tax);
@@ -226,21 +214,16 @@ async function downloadPayslipPDF(req, res) {
     const netPay = parseFloat(slip.net_pay);
 
     const payslipData = {
-      business: {
+      ...buildPayslipData({
         businessName: slip.business_name,
-      },
-      employee: {
         firstName: slip.first_name,
         lastName: slip.last_name,
+        address: undefined,
         hourlyRate: parseFloat(slip.hourly_rate),
         taxCode: slip.tax_code,
         irdNumber: slip.ird_number,
-      },
-      period: {
-        start: slip.pay_period_start,
-        end: slip.pay_period_end,
-      },
-      payPeriodInput: {
+        payPeriodStart: slip.pay_period_start,
+        payPeriodEnd: slip.pay_period_end,
         regularHours: breakdown.regularHours || 0,
       },
       engineOutput: {
@@ -264,7 +247,7 @@ async function downloadPayslipPDF(req, res) {
     };
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=payslip-${id}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=payslip-${parsedId}.pdf`);
 
     generatePayslipPDF(payslipData, res);
 
@@ -282,7 +265,7 @@ async function getPayslips(req, res) {
   res.json({ payslips: [] });
 }
 
-// GENERATE PAYSLIP PDF  (on request) //
+// generates a payslip PDF from requested data
 async function generatePayslipPDFFromRequest(req, res) {
   try {
     const {
@@ -312,16 +295,14 @@ async function generatePayslipPDFFromRequest(req, res) {
       wageType: 'adult',
       usualDaysPerWeek: 5,
       taxCode: taxCode || 'M',
-      kiwisaverRate: kiwisaverRate != null && kiwisaverRate !== '' ? parseFloat(kiwisaverRate) : null,
+      kiwisaverRate: kiwiSaverNumber,
     };
 
     const enginePayPeriod = {
-      regularHours: parseFloat(hoursWorked),
       overtimeHours: 0,
-      publicHolidays: [],
       leaveDaysTaken: 0,
-      owp: parseFloat(hourlyRate) * 40,
-      awe: parseFloat(hourlyRate) * 40,
+      owp: hourlyRateNumber * 40,
+      awe: hourlyRateNumber * 40,
     };
 
     let result;
@@ -371,13 +352,17 @@ async function generatePayslipPDFFromRequest(req, res) {
     };
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=payslip-${lastName}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=payslip-${safeDownloadName(lastName)}.pdf`);
 
     generatePayslipPDF(payslipData, res);
 
   } catch (error) {
-    console.error('generatePayslipPDFFromRequest error:', error.message);
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) {
+      sendError(res, 500, 'Could not generate the payslip', error)
+    } else {
+      console.error('generatePayslipPDF stream failed', error)
+      res.end()
+    }
   }
 }
 
