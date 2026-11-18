@@ -283,7 +283,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-slate-600 dark:text-sky-100/70">
-                  Predicted revenue with confidence band.
+                  Six-month predicted revenue with confidence band.
                 </p>
               </div>
               <div className="flex gap-2">

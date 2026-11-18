@@ -27,7 +27,7 @@ export function AnalyticsNlqPanel({
 }) {
   return (
     <>
-      <section className="rounded-[26px] border border-sky-200/80 bg-white/85 p-5 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none">
+      <section className="sticky bottom-3 z-40 rounded-[26px] border border-sky-200/80 bg-white/95 p-5 shadow-[0_-12px_35px_rgba(14,165,233,0.16)] backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-950/95 dark:shadow-none">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
           <div className="flex-1 space-y-4">
             <div>

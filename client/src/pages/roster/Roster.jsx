@@ -33,6 +33,7 @@ const dateValue = (date) => [
 ].join('-')
 
 const hoursBetween = (start, end) => (end - start) / 36e5
+const employeeKey = (value) => String(value ?? '')
 const currencyFormatter = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
 
 const defaultPeriods = [
@@ -60,6 +61,7 @@ export default function Rostering() {
     const start = mondayOf(new Date())
     const end = new Date(start)
     end.setDate(end.getDate() + 6)
+    end.setHours(23, 59, 59, 999)
     return { start, end }
   })
   const [isDayView, setIsDayView] = useState(false)
@@ -112,6 +114,15 @@ export default function Rostering() {
   }, [])
 
   useEffect(() => writeDemoShifts(shifts), [shifts])
+  useEffect(() => {
+    const refreshShifts = () => setShifts(readDemoShifts())
+    window.addEventListener('storage', refreshShifts)
+    window.addEventListener('vizura-demo-roster-changed', refreshShifts)
+    return () => {
+      window.removeEventListener('storage', refreshShifts)
+      window.removeEventListener('vizura-demo-roster-changed', refreshShifts)
+    }
+  }, [])
   useEffect(() => localStorage.setItem('vizura-roster-day-periods', JSON.stringify(dayPeriods)), [dayPeriods])
 
   const hoursByEmployee = useMemo(() => {
@@ -119,7 +130,8 @@ export default function Rostering() {
     shifts.forEach((shift) => {
       const shiftDate = new Date(shift.StartTime)
       if (shiftDate >= range.start && shiftDate <= range.end) {
-        totals[shift.EmployeeId] = (totals[shift.EmployeeId] ?? 0) + hoursBetween(shift.StartTime, shift.EndTime)
+        const key = employeeKey(shift.EmployeeId)
+        if (key) totals[key] = (totals[key] ?? 0) + hoursBetween(shift.StartTime, shift.EndTime)
       }
     })
     return totals
@@ -128,7 +140,9 @@ export default function Rostering() {
   const visibleEmployees = employees
   const totalHours = Object.values(hoursByEmployee).reduce((total, hours) => total + hours, 0)
   const labourCost = shifts.reduce((total, shift) => {
-    const employee = employees.find((record) => record.id === shift.EmployeeId)
+    const shiftDate = new Date(shift.StartTime)
+    if (shiftDate < range.start || shiftDate > range.end) return total
+    const employee = employees.find((record) => employeeKey(record.id) === employeeKey(shift.EmployeeId))
     return total + hoursBetween(shift.StartTime, shift.EndTime) * (employee?.hourlyRate || 0)
   }, 0)
   const hasDrafts = shifts.some((shift) => !shift.IsPublished)
@@ -359,7 +373,7 @@ export default function Rostering() {
                   eventSettings={{
                     dataSource: shifts,
                     template: (props) => {
-                      const employee = employees.find((record) => record.id === props.EmployeeId)
+                      const employee = employees.find((record) => employeeKey(record.id) === employeeKey(props.EmployeeId))
                       return (
                         <div className="roster-event-template px-1 text-xs leading-tight">
                           {props.Section && <strong className="block truncate">{props.Section}</strong>}
@@ -390,10 +404,21 @@ export default function Rostering() {
                   actionComplete={(args) => {
                     if (args.requestType === 'dateNavigate' || args.requestType === 'viewNavigate') {
                       const dates = scheduler.current?.getCurrentViewDates() || []
-                      if (dates.length) setRange({ start: dates[0], end: dates[dates.length - 1] })
+                      if (dates.length) {
+                        const start = new Date(dates[0])
+                        start.setHours(0, 0, 0, 0)
+                        const end = new Date(dates[dates.length - 1])
+                        end.setHours(23, 59, 59, 999)
+                        setRange({ start, end })
+                      }
                       if (args.requestType === 'viewNavigate' && scheduler.current?.currentView === 'Day') {
                         openDayView(dates[0] || range.start)
                       }
+                    }
+                    if (['eventChanged', 'eventDrop', 'eventResize'].includes(args.requestType) && args.data) {
+                      setShifts((current) => current.map((shift) =>
+                        Number(shift.Id) === Number(args.data.Id) ? { ...shift, ...args.data } : shift,
+                      ))
                     }
                   }}
                   actionBegin={(args) => {

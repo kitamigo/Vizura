@@ -4,7 +4,8 @@ const db = require('../config/db')
 // -- Constants -- //
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000'
 const AI_SERVICE_TIMEOUT = Number(process.env.AI_SERVICE_TIMEOUT_MS || 60000)
-const MIN_DATA_POINTS = 10
+const MIN_FORECAST_POINTS = 30
+const MIN_ANOMALY_POINTS = 10
 const MAX_STORED_UPLOADS = 5
 const REVENUE_COLUMNS = new Set(['revenue', 'revenue_nzd', 'sales', 'amount', 'value'])
 const HOLIDAY_COLUMNS = new Set(['holiday_name', 'event_name'])
@@ -210,9 +211,9 @@ function filterByDateRange(points, { startDate, endDate } = {}) {
   )
 }
 
-function insufficientDataResponse(res, found) {
+function insufficientDataResponse(res, found, minimum = MIN_ANOMALY_POINTS) {
   return res.status(400).json({
-    error: `Insufficient data points in the selected date range. At least ${MIN_DATA_POINTS} are required.`,
+    error: `Insufficient data points in the selected date range. At least ${minimum} are required.`,
     found,
   })
 }
@@ -265,10 +266,78 @@ async function postToAiService(path, body, normalize) {
 }
 
 const callForecastService = (dataPoints) =>
-  postToAiService('/forecast/predict', { data: dataPoints, days: 30 }, normalizeForecast)
+  postToAiService('/forecast/predict', { data: dataPoints, days: 180 }, normalizeForecast)
 
 const callAnomalyService = (dataPoints) =>
   postToAiService('/anomaly/detect', { data: dataPoints }, normalizeAnomalies)
+
+function fallbackForecast(dataPoints) {
+  if (!dataPoints.length) return emptyForecast()
+
+  const sorted = [...dataPoints].sort((a, b) => String(a.date).localeCompare(String(b.date)))
+  const values = sorted.map((point) => Number(point.revenue)).filter(Number.isFinite)
+  if (!values.length) return emptyForecast()
+
+  const windowSize = Math.min(14, values.length)
+  const recent = values.slice(-windowSize)
+  const baseline = recent.reduce((sum, value) => sum + value, 0) / recent.length
+  const prior = values.slice(-Math.min(30, values.length))
+  const mean = prior.reduce((sum, value) => sum + value, 0) / prior.length
+  const variance = prior.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / prior.length
+  const deviation = Math.sqrt(variance)
+  const lastDate = new Date(`${sorted[sorted.length - 1].date}T00:00:00`)
+  if (Number.isNaN(lastDate.getTime())) return emptyForecast()
+
+  const dates = []
+  const ensembleForecast = []
+  const lowerBound = []
+  const upperBound = []
+  for (let index = 1; index <= 180; index += 1) {
+    const date = new Date(lastDate)
+    date.setDate(date.getDate() + index)
+    const trend = (baseline - mean) * (index / 180)
+    const predicted = Math.max(0, baseline + trend)
+    dates.push(date.toISOString().split('T')[0])
+    ensembleForecast.push(Number(predicted.toFixed(2)))
+    lowerBound.push(Number(Math.max(0, predicted - deviation * 1.96).toFixed(2)))
+    upperBound.push(Number((predicted + deviation * 1.96).toFixed(2)))
+  }
+  return { dates, ensemble_forecast: ensembleForecast, lower_bound: lowerBound, upper_bound: upperBound }
+}
+
+function fallbackAnomalies(dataPoints) {
+  const values = dataPoints.map((point) => Number(point.revenue)).filter(Number.isFinite)
+  if (!values.length) return emptyAnomalies()
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+  const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length
+  const deviation = Math.sqrt(variance) || 1
+  const anomalies = dataPoints
+    .map((point) => {
+      const value = Number(point.revenue)
+      if (!Number.isFinite(value)) return null
+      const zScore = Math.abs((value - mean) / deviation)
+      if (zScore < 2) return null
+      const deviationPct = mean ? ((value - mean) / mean) * 100 : 0
+      return {
+        date: point.date,
+        value,
+        expected_value: Number(mean.toFixed(2)),
+        deviation_pct: Number(deviationPct.toFixed(2)),
+        severity: zScore >= 3 ? 'critical' : 'warning',
+        method: 'zscore',
+        explanation: `${point.date} revenue is ${Math.abs(deviationPct).toFixed(1)}% from the dataset average`,
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    total_points: dataPoints.length,
+    anomalies_found: anomalies.length,
+    anomaly_rate: dataPoints.length ? anomalies.length / dataPoints.length : 0,
+    summary: anomalies.length ? `${anomalies.length} revenue anomalies detected.` : 'No significant revenue anomalies detected.',
+    anomalies,
+  }
+}
 
 // runs both calls in parallel, failures become null
 function runAnalytics(dataPoints, label) {
@@ -277,10 +346,13 @@ function runAnalytics(dataPoints, label) {
       if (label) console.error(`${name} service error:`, err.message)
       return null
     })
-  return Promise.all([
-    safely(callForecastService(dataPoints), 'forecast'),
-    safely(callAnomalyService(dataPoints), 'anomaly'),
-  ])
+  const forecastPromise = safely(callForecastService(dataPoints), 'forecast').then(
+    (forecast) => forecast || fallbackForecast(dataPoints),
+  )
+  const anomalyPromise = safely(callAnomalyService(dataPoints), 'anomaly').then(
+    (anomalies) => anomalies || fallbackAnomalies(dataPoints),
+  )
+  return Promise.all([forecastPromise, anomalyPromise])
 }
 
 // -- analytics endpoints -- //
@@ -300,7 +372,7 @@ async function runForecast(req, res) {
   }
 
   const dataPoints = filterByDateRange(latestDataPoints, req.body)
-  if (dataPoints.length < MIN_DATA_POINTS) return insufficientDataResponse(res, dataPoints.length)
+  if (dataPoints.length < MIN_FORECAST_POINTS) return insufficientDataResponse(res, dataPoints.length, MIN_FORECAST_POINTS)
 
   try {
     const forecast = await callForecastService(dataPoints)
@@ -324,7 +396,7 @@ async function getAnomalies(req, res) {
   }
 
   const dataPoints = filterByDateRange(latestDataPoints, req.query)
-  if (dataPoints.length < MIN_DATA_POINTS) return insufficientDataResponse(res, dataPoints.length)
+  if (dataPoints.length < MIN_ANOMALY_POINTS) return insufficientDataResponse(res, dataPoints.length)
 
   try {
     const anomalyResult = await callAnomalyService(dataPoints)
@@ -410,7 +482,7 @@ async function activateUploadedFile(req, res) {
 
     const row = rows[0]
     const dataPoints = parseCsvToDataPoints(row.csv_content)
-    if (dataPoints.length < MIN_DATA_POINTS) {
+    if (dataPoints.length < MIN_FORECAST_POINTS) {
       return res.status(400).json({ message: 'The uploaded CSV does not contain enough valid rows.' })
     }
 
@@ -527,9 +599,9 @@ async function uploadCsv(req, res) {
   latestUpload = { fileName, uploadedAt }
   latestDataPoints = dataPoints
 
-  if (dataPoints.length < MIN_DATA_POINTS) {
+  if (dataPoints.length < MIN_FORECAST_POINTS) {
     return res.status(400).json({
-      error: `CSV must contain at least ${MIN_DATA_POINTS} valid data rows with date and revenue columns.`,
+      error: `CSV must contain at least ${MIN_FORECAST_POINTS} valid data rows with date and revenue columns.`,
       found: dataPoints.length,
     })
   }

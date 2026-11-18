@@ -55,6 +55,57 @@ function executeQuery(db, sql) {
       return []
     }
 
+    function getFallbackNlq(question) {
+      const normalized = question.toLowerCase()
+      if (/highest|best|top/.test(normalized) && /(day|date|revenue)/.test(normalized)) {
+        return {
+          sql: 'SELECT date, revenue FROM sales ORDER BY CAST(revenue AS REAL) DESC LIMIT 1',
+          answer: 'Returns the date with the highest revenue.',
+          mode: 'rule_based',
+        }
+      }
+      if (/lowest|worst|least/.test(normalized) && /(day|date|revenue)/.test(normalized)) {
+        return {
+          sql: 'SELECT date, revenue FROM sales ORDER BY CAST(revenue AS REAL) ASC LIMIT 1',
+          answer: 'Returns the date with the lowest revenue.',
+          mode: 'rule_based',
+        }
+      }
+      if (/trend|breakdown|by month/.test(normalized)) {
+        return {
+          sql: "SELECT substr(date, 1, 7) AS month, SUM(CAST(revenue AS REAL)) AS total_revenue FROM sales GROUP BY month ORDER BY month",
+          answer: 'Groups revenue by month.',
+          mode: 'rule_based',
+        }
+      }
+      if (/average|avg/.test(normalized)) {
+        return {
+          sql: 'SELECT AVG(CAST(revenue AS REAL)) AS avg_daily_revenue FROM sales',
+          answer: 'Calculates average daily revenue.',
+          mode: 'rule_based',
+        }
+      }
+      if (/total|sum/.test(normalized) && /(revenue|sales)/.test(normalized)) {
+        return {
+          sql: 'SELECT SUM(CAST(revenue AS REAL)) AS total_revenue FROM sales',
+          answer: 'Calculates total revenue across the uploaded CSV.',
+          mode: 'rule_based',
+        }
+      }
+      if (/anomal/.test(normalized)) {
+        return {
+          sql: 'SELECT date, revenue FROM sales ORDER BY CAST(revenue AS REAL) DESC',
+          answer: 'Returns revenue records ordered by value for anomaly review.',
+          mode: 'rule_based',
+        }
+      }
+      return {
+        sql: "SELECT substr(date, 1, 7) AS month, SUM(CAST(revenue AS REAL)) AS total_revenue FROM sales GROUP BY month ORDER BY month",
+        answer: 'Groups uploaded revenue by month.',
+        mode: 'rule_based',
+      }
+    }
+
     const stmt = db.prepare(sql)
     const rows = stmt.all()
     return rows
@@ -139,22 +190,16 @@ async function queryNlq(req, res) {
   }
 
   try {
-    const modelResponse = await callNlqModel(question)
-
-    // Returns a pending response when the model is not connected
-    if (!modelResponse) {
-      return res.status(202).json({
-        question,
-        sql: '',
-        confidence: 0,
-        method: 'pending_model',
-        rows: [],
-        row_count: 0,
-        message: 'Configure AI_SERVICE_URL or NLQ_MODEL_URL to connect your model.',
-      })
+    let source
+    try {
+      const modelResponse = await callNlqModel(question)
+      source = modelResponse?.data || modelResponse || null
+    } catch (modelError) {
+      console.warn('NLQ model unavailable, using rule-based fallback:', modelError.message)
+      source = null
     }
+    if (!source?.sql) source = getFallbackNlq(question)
 
-    const source = modelResponse?.data || modelResponse || {}
     const generatedSql = source.sql || ''
 
     // Execute SQL against in-memory DB built from the uploaded CSV
@@ -169,7 +214,6 @@ async function queryNlq(req, res) {
         const db = buildDatabaseFromCsv(csvContent)
         if (db) {
           const columnMap = {
-            revenue: 'revenue_nzd',
             amount: 'revenue_nzd',
             value: 'revenue_nzd',
             payslip: 'payslip_total_nzd',
@@ -185,6 +229,16 @@ async function queryNlq(req, res) {
             labor_cost: 'labour_cost_pct',
           }
           let fixedSql = generatedSql
+          const csvHeaders = csvContent
+            .split('\n')[0]
+            .split(',')
+            .map((header) => header.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'))
+          const actualRevenueHeader = csvHeaders.find((header) =>
+            ['revenue', 'revenue_nzd', 'sales', 'amount', 'value'].includes(header),
+          )
+          if (actualRevenueHeader && actualRevenueHeader !== 'revenue') {
+            fixedSql = fixedSql.replace(/\brevenue\b/gi, actualRevenueHeader)
+          }
           for (const [generic, actual] of Object.entries(columnMap)) {
             fixedSql = fixedSql.replace(new RegExp(`\\b${generic}\\b`, 'gi'), actual)
           }

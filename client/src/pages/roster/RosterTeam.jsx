@@ -10,7 +10,8 @@ export default function RosterTeam({ employees, hoursByEmployee, onDragStart, se
       </div>
       <div className="mt-4 space-y-2">
         {employees.map((employee) => {
-          const hours = hoursByEmployee[employee.id] ?? 0
+          const employeeKey = String(employee.id ?? '')
+          const hours = hoursByEmployee[employeeKey] ?? 0
           const status = hours > 50
             ? 'over'
             : (employee.employmentType === 'Casual' || hours >= employee.minimumHours)

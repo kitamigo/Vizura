@@ -29,7 +29,7 @@ class DataPoint(BaseModel):
 class ForecastRequest(BaseModel):
     """Request body for generating a forecast."""
     data: List[DataPoint] = Field(..., min_length=30, max_length=5000)
-    days: int = Field(30, ge=7, le=90)
+    days: int = Field(180, ge=7, le=184)
     business_id: Optional[str] = None
 
 

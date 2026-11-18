@@ -63,6 +63,7 @@ function getRosterShifts(employeeId, start, end) {
   const endDate = new Date(`${end}T23:59:59`)
 
   return readDemoShifts()
+    .filter((shift) => shift.IsPublished)
     .filter((shift) => String(shift.EmployeeId) === String(employeeId))
     .filter((shift) => new Date(shift.StartTime) >= startDate)
     .filter((shift) => new Date(shift.StartTime) <= endDate)
@@ -105,6 +106,28 @@ function GeneratePayslipForm() {
     return () => {
       window.removeEventListener('storage', refreshEmployees)
       window.removeEventListener('vizura-employees-changed', refreshEmployees)
+    }
+  }, [])
+
+  useEffect(() => {
+    const refreshRosterHours = () => {
+      setForm((current) => {
+        if (!current.employeeId) return current
+        const shifts = getRosterShifts(current.employeeId, current.payPeriodStart, current.payPeriodEnd)
+        return {
+          ...current,
+          hoursWorked: shifts.length
+            ? shifts.reduce((total, shift) => total + shift.hours, 0).toFixed(2)
+            : '',
+          shifts,
+        }
+      })
+    }
+    window.addEventListener('storage', refreshRosterHours)
+    window.addEventListener('vizura-demo-roster-changed', refreshRosterHours)
+    return () => {
+      window.removeEventListener('storage', refreshRosterHours)
+      window.removeEventListener('vizura-demo-roster-changed', refreshRosterHours)
     }
   }, [])
 
