@@ -1,20 +1,96 @@
 const db = require('../config/db');
 const { calcPayRun } = require('../utils/payrollEngine');
-const { isPublicHoliday } = require('../utils/nzHolidays');
 const { generatePayslipPDF } = require('../utils/payslipPDF');
+const {
+  isValidDateRange,
+  toFiniteNumber,
+  safeDownloadName,
+  normalizeEmploymentType,
+  calculateShiftHours,
+} = require('../utils/payrollHelpers');
+
+function sendError(res, status, message, error) {
+  if (error) console.error(message, error)
+  return res.status(status).json({ error: message })
+}
+
+function getTaxYearStart(payPeriodEnd) {
+  const end = new Date(`${payPeriodEnd}T00:00:00`)
+  if (Number.isNaN(end.getTime())) return null
+  const startYear = end.getMonth() >= 3 ? end.getFullYear() : end.getFullYear() - 1
+  return `${startYear}-04-01`
+}
+
+function normalizeEmployeeIds(employeeIds) {
+  if (!Array.isArray(employeeIds)) return []
+  return [...new Set(employeeIds
+    .map(toFiniteNumber)
+    .filter((id) => Number.isInteger(id) && id > 0))]
+}
+
+function buildPayslipData({
+  businessName,
+  firstName,
+  lastName,
+  address,
+  hourlyRate,
+  taxCode,
+  irdNumber,
+  payPeriodStart,
+  payPeriodEnd,
+  regularHours,
+  result,
+  employmentType,
+  ytd = { gross: 0, paye: 0, kiwisaver: 0 },
+}) {
+  return {
+    business: { businessName: businessName || '' },
+    employee: {
+      firstName,
+      lastName,
+      address,
+      hourlyRate,
+      taxCode,
+      irdNumber,
+    },
+    period: {
+      start: payPeriodStart,
+      end: payPeriodEnd,
+    },
+    payPeriodInput: { regularHours },
+    engineOutput: {
+      regPay: result.regPay || 0,
+      totalHolidayPay: result.totalHolidayPay || 0,
+      leavePay: result.leavePay || 0,
+      holidayPayAddition: result.holidayPayAddition || 0,
+      employmentType,
+      grossPay: result.grossPay,
+      payeTax: result.payeTax,
+      kiwisaverEmployee: result.kiwisaverEmployee,
+      kiwisaverEmployer: result.kiwisaverEmployer,
+      totalDeductions: result.totalDeductions,
+      netPay: result.netPay,
+    },
+    ytdEarnings: ytd,
+  }
+}
 
 async function createPayRun(req, res) {
+  let client
+  let transactionFinished = false
   try {
     const { employeeIds, payPeriod } = req.body;
-    const { start, end, weeks } = payPeriod || {};
+    const { start, end } = payPeriod || {};
+    const normalizedEmployeeIds = normalizeEmployeeIds(employeeIds)
 
-    if (!employeeIds?.length || !start || !end || !weeks) {
+    if (!normalizedEmployeeIds.length || !isValidDateRange(start, end)) {
       return res.status(400).json({
-        error: 'employeeIds, payPeriod.start, payPeriod.end and payPeriod.weeks are required'
+        error: 'employeeIds and a valid payPeriod start/end date range are required'
       });
     }
 
-    // Gets business and region //
+
+    // gets business and region
     const bizResult = await db.query(
       'SELECT business_id, public_holiday_region FROM businesses WHERE user_id = $1',
       [req.user.user_id]
@@ -27,64 +103,103 @@ async function createPayRun(req, res) {
     const { business_id, public_holiday_region } = bizResult.rows[0];
     const region = public_holiday_region || 'Canterbury';
 
-        // Fetchs employees with tax and KiwiSaver details //
+    // fetchs employees with tax and KiwiSaver details
     const employeeResult = await db.query(
       `SELECT e.employee_id,
               u.first_name || ' ' || u.last_name AS name,
               e.hourly_rate,
               e.contract_type,
               e.tax_code,
-              e.kiwisaver_rate,
-              e.ird_number
+              e.kiwisaver_rate
        FROM employees e
        JOIN users u ON e.user_id = u.user_id
        WHERE e.employee_id = ANY($1) AND e.business_id = $2`,
-      [employeeIds, business_id]
+      [normalizedEmployeeIds, business_id]
     );
 
     if (!employeeResult.rows.length) {
       return res.status(404).json({ message: 'No matching employees found for this business' });
     }
 
-    // Fetchs shifts //
-    const shiftResult = await db.query(
+    const matchedIds = employeeResult.rows.map((employee) => employee.employee_id)
+    const skippedIds = normalizedEmployeeIds.filter((id) =>
+      !matchedIds.some((matchedId) => Number(matchedId) === Number(id))
+    )
+    if (skippedIds.length) {
+      return res.status(400).json({
+        error: 'Some employees do not belong to this business',
+        skippedEmployeeIds: skippedIds,
+      })
+    }
+
+    client = await db.connect()
+    await client.query('BEGIN')
+
+    // fetchs shifts
+    const shiftResult = await client.query(
       `SELECT employee_id, date, hours_worked
        FROM shifts
        WHERE employee_id = ANY($1)
          AND date >= $2 AND date <= $3`,
-      [employeeIds, start, end]
+      [matchedIds, start, end]
     );
 
     const allShifts = shiftResult.rows;
     const results = [];
+
+    const taxYearStart = getTaxYearStart(end)
+    const ytdResult = await client.query(
+      `SELECT employee_id,
+              COALESCE(SUM(gross_pay), 0) AS ytd_gross,
+              COALESCE(SUM(paye_tax), 0) AS ytd_paye,
+              COALESCE(SUM(kiwisaver_employee), 0) AS ytd_kiwisaver
+       FROM payslips
+       WHERE employee_id = ANY($1)
+         AND pay_period_end >= $2
+         AND pay_period_end <= $3
+       GROUP BY employee_id`,
+      [matchedIds, taxYearStart, end],
+    )
+    const ytdByEmployee = new Map(
+      ytdResult.rows.map((row) => [Number(row.employee_id), {
+        gross: parseFloat(row.ytd_gross) || 0,
+        paye: parseFloat(row.ytd_paye) || 0,
+        kiwisaver: parseFloat(row.ytd_kiwisaver) || 0,
+      }])
+    )
+
+    const duplicateResult = await client.query(
+      `SELECT employee_id
+       FROM payslips
+       WHERE employee_id = ANY($1)
+         AND pay_period_start = $2
+         AND pay_period_end = $3`,
+      [matchedIds, start, end],
+    )
+    if (duplicateResult.rows.length) {
+      await client.query('ROLLBACK')
+      transactionFinished = true
+      return res.status(409).json({
+        error: 'A payslip already exists for this employee and pay period',
+        duplicateEmployeeIds: duplicateResult.rows.map((row) => row.employee_id),
+      })
+    }
 
     for (const emp of employeeResult.rows) {
       const empShifts = allShifts.filter(
         s => String(s.employee_id) === String(emp.employee_id)
       );
 
-      // Calculates hours and detects public holidays from shifts //
-      let regularHours = 0;
-      let overtimeHours = 0;
-      const publicHolidays = [];
+      // calculates hours and detects public holidays from shifts
+      const { regularHours, publicHolidays } =
+        calculateShiftHours(empShifts, region)
 
-      for (const shift of empShifts) {
-        const dateStr = new Date(shift.date).toISOString().split('T')[0];
-        const hours = parseFloat(shift.hours_worked) || 0;
-
-        if (isPublicHoliday(dateStr, region)) {
-          publicHolidays.push({ date: dateStr, hoursWorked: hours, worked: true });
-        } else {
-          // no OT in NZ unless stated in employment contract
-          regularHours += hours;
-        }
-      }
-
-            // Builds objects in the shape the engine expects 
+      // builds the employee and pay period objects for the payroll engine
       const engineEmployee = {
         hourlyRate: parseFloat(emp.hourly_rate),
-        employmentType: emp.contract_type,
+        employmentType: normalizeEmploymentType(emp.contract_type),
         wageType: 'adult',
+        // TEMP PLACEHOLDERS
         usualDaysPerWeek: 5,
         taxCode: emp.tax_code || 'M',
         kiwisaverRate: emp.kiwisaver_rate != null ? parseFloat(emp.kiwisaver_rate) : null,
@@ -95,39 +210,38 @@ async function createPayRun(req, res) {
         overtimeHours: 0,
         publicHolidays,
         leaveDaysTaken: 0,
+        // TEMP PLACEHOLDERS
         owp: parseFloat(emp.hourly_rate) * 40,
         awe: parseFloat(emp.hourly_rate) * 40,
       };
 
-      // Fetch YTD values 
-      let ytdGross = 0;
-      let ytdPAYE = 0;
-      let ytdKiwiSaver = 0;
-      const ytdResult = await db.query(
-        `SELECT ytd_gross, ytd_paye, ytd_kiwisaver FROM payslips
-         WHERE employee_id = $1 ORDER BY payslip_id DESC LIMIT 1`,
-        [emp.employee_id]
-      );
-      if (ytdResult.rows.length) {
-        ytdGross = parseFloat(ytdResult.rows[0].ytd_gross) || 0;
-        ytdPAYE = parseFloat(ytdResult.rows[0].ytd_paye) || 0;
-        ytdKiwiSaver = parseFloat(ytdResult.rows[0].ytd_kiwisaver) || 0;
+      const ytd = ytdByEmployee.get(Number(emp.employee_id)) || {
+        gross: 0,
+        paye: 0,
+        kiwisaver: 0,
       }
 
-      // Wage error handling
+      // wage error handling
       let result;
       try {
-        result = calcPayRun(engineEmployee, enginePayPeriod, { ytdGross, ytdPAYE, ytdKiwiSaver });
+        result = calcPayRun(engineEmployee, enginePayPeriod, {
+          ytdGross: ytd.gross,
+          ytdPAYE: ytd.paye,
+          ytdKiwiSaver: ytd.kiwisaver,
+        });
       } catch (wageError) {
-        results.push({ employee_id: emp.employee_id, name: emp.name, error: wageError.message });
-        continue;
+        await client.query('ROLLBACK')
+        transactionFinished = true
+        return res.status(400).json({
+          error: wageError.message,
+          employeeId: emp.employee_id,
+          employeeName: emp.name,
+        })
       }
 
-
-      const newYtdGross = ytdGross + result.grossPay;
-      const newYtdPAYE = ytdPAYE + result.payeTax;
-      const newYtdKiwiSaver = ytdKiwiSaver + result.kiwisaverEmployee;
-
+      const newYtdGross = ytd.gross + result.grossPay;
+      const newYtdPAYE = ytd.paye + result.payeTax;
+      const newYtdKiwiSaver = ytd.kiwisaver + result.kiwisaverEmployee;
       const breakdown = {
         regPay: result.regPay,
         totalHolidayPay: result.totalHolidayPay,
@@ -136,8 +250,7 @@ async function createPayRun(req, res) {
         employmentType: emp.contract_type,
         regularHours,
       };
-
-      const persistResult = await db.query(
+      const persistResult = await client.query(
         `INSERT INTO payslips
          (employee_id, business_id, pay_period_start, pay_period_end,
           gross_pay, paye_tax, kiwisaver_employee, kiwisaver_employer,
@@ -162,18 +275,32 @@ async function createPayRun(req, res) {
       });
     }
 
+    await client.query('COMMIT')
+    transactionFinished = true
     res.status(201).json({ results });
 
   } catch (error) {
-    console.error('createPayRun error:', error.message);
-    res.status(500).json({ error: error.message });
+    sendError(res, 500, 'Could not create the pay run', error)
+  } finally {
+    if (client) {
+      if (!transactionFinished) {
+        try { await client.query('ROLLBACK') } catch (rollbackError) {
+          console.error('payroll transaction rollback failed', rollbackError)
+        }
+      }
+      client.release()
+    }
   }
 }
 
-// DOWNLOAD PAYSLIP PDF //
+// - Download Payslip PDF - //
 async function downloadPayslipPDF(req, res) {
   try {
     const { id } = req.params;
+    const parsedId = toFiniteNumber(id)
+    if (parsedId == null || !Number.isInteger(parsedId)) {
+      return res.status(400).json({ error: 'A valid payslip ID is required' })
+    }
 
     const result = await db.query(
       `SELECT
@@ -186,7 +313,7 @@ async function downloadPayslipPDF(req, res) {
        JOIN users u ON e.user_id = u.user_id
        JOIN businesses b ON p.business_id = b.business_id
        WHERE p.payslip_id = $1`,
-      [id]
+      [parsedId]
     );
 
     if (!result.rows.length) {
@@ -195,13 +322,12 @@ async function downloadPayslipPDF(req, res) {
 
     const slip = result.rows[0];
 
-    // Authorization (only the employee/manager can view) 
-    const isOwner = req.user.user_id === slip.employee_user_id;
-    const isManager = req.user.user_id === slip.manager_user_id;
+    // authorization - only the employee or manager can view
+    const isOwner = Number(req.user.user_id) === Number(slip.employee_user_id);
+    const isManager = Number(req.user.user_id) === Number(slip.manager_user_id);
     if (!isOwner && !isManager) {
       return res.status(403).json({ error: 'Not authorized to view this payslip' });
     }
-
     const breakdown = slip.breakdown || {};
     const grossPay = parseFloat(slip.gross_pay);
     const payeTax = parseFloat(slip.paye_tax);
@@ -211,63 +337,143 @@ async function downloadPayslipPDF(req, res) {
     const netPay = parseFloat(slip.net_pay);
 
     const payslipData = {
-      business: {
+      ...buildPayslipData({
         businessName: slip.business_name,
-      },
-      employee: {
         firstName: slip.first_name,
         lastName: slip.last_name,
+        address: undefined,
         hourlyRate: parseFloat(slip.hourly_rate),
         taxCode: slip.tax_code,
         irdNumber: slip.ird_number,
-      },
-      period: {
-        start: slip.pay_period_start,
-        end: slip.pay_period_end,
-      },
-      payPeriodInput: {
+        payPeriodStart: slip.pay_period_start,
+        payPeriodEnd: slip.pay_period_end,
         regularHours: breakdown.regularHours || 0,
-      },
-      engineOutput: {
-        regPay: breakdown.regPay || 0,
-        totalHolidayPay: breakdown.totalHolidayPay || 0,
-        leavePay: breakdown.leavePay || 0,
-        holidayPayAddition: breakdown.holidayPayAddition || 0,
+        result: {
+          grossPay,
+          payeTax,
+          kiwisaverEmployee,
+          kiwisaverEmployer,
+          totalDeductions,
+          netPay,
+          regPay: breakdown.regPay,
+          totalHolidayPay: breakdown.totalHolidayPay,
+          leavePay: breakdown.leavePay,
+          holidayPayAddition: breakdown.holidayPayAddition,
+        },
         employmentType: breakdown.employmentType || slip.contract_type,
-        grossPay,
-        payeTax,
-        kiwisaverEmployee,
-        kiwisaverEmployer,
-        totalDeductions,
-        netPay,
-      },
-      ytdEarnings: {
-        gross: parseFloat(slip.ytd_gross) - grossPay,
-        paye: parseFloat(slip.ytd_paye) - payeTax,
-        kiwisaver: parseFloat(slip.ytd_kiwisaver) - kiwisaverEmployee,
-      },
+        ytd: {
+          gross: parseFloat(slip.ytd_gross) - grossPay,
+          paye: parseFloat(slip.ytd_paye) - payeTax,
+          kiwisaver: parseFloat(slip.ytd_kiwisaver) - kiwisaverEmployee,
+        },
+      }),
     };
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=payslip-${id}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=payslip-${parsedId}.pdf`);
 
     generatePayslipPDF(payslipData, res);
 
   } catch (error) {
-    console.error('downloadPayslipPDF error:', error.message);
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) {
+      sendError(res, 500, 'Could not download the payslip', error)
+    } else {
+      console.error('downloadPayslipPDF stream failed', error)
+      res.end()
+    }
   }
 }
 
+// - List Pay Runs - //
 async function listPayRuns(req, res) {
-  res.json({ payRuns: [] });
+  try {
+    const bizResult = await db.query(
+      'SELECT business_id FROM businesses WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (!bizResult.rows.length) {
+      return res.status(404).json({ message: 'No business found for this user' });
+    }
+    const businessId = bizResult.rows[0].business_id;
+    const result = await db.query(
+      `SELECT p.pay_period_start,
+              p.pay_period_end,
+              COUNT(*)::int AS employee_count,
+              COALESCE(SUM(p.gross_pay), 0) AS gross_pay,
+              COALESCE(SUM(p.total_deductions), 0) AS total_deductions,
+              COALESCE(SUM(p.kiwisaver_employer), 0) AS employer_contributions,
+              COALESCE(SUM(p.net_pay), 0) AS net_pay,
+              MAX(p.created_at) AS created_at,
+              JSON_AGG(
+                JSON_BUILD_OBJECT(
+                  'payslip_id', p.payslip_id,
+                  'employee_id', p.employee_id,
+                  'employee_name', u.first_name || ' ' || u.last_name,
+                  'gross_pay', p.gross_pay,
+                  'net_pay', p.net_pay,
+                  'breakdown', p.breakdown
+                )
+              ) AS payslips
+       FROM payslips p
+       JOIN employees e ON p.employee_id = e.employee_id
+       JOIN users u ON e.user_id = u.user_id
+       WHERE p.business_id = $1
+       GROUP BY p.pay_period_start, p.pay_period_end
+       ORDER BY p.pay_period_start DESC, p.pay_period_end DESC`,
+      [businessId]
+    );
+
+    res.json({ payRuns: result.rows });
+  } catch (error) {
+    sendError(res, 500, 'Could not load pay runs', error)
+  }
 }
 
+// gets payslips for a specific employee
 async function getPayslips(req, res) {
-  res.json({ payslips: [] });
+  try {
+    const { employeeId } = req.params;
+    const parsedEmployeeId = toFiniteNumber(employeeId)
+    if (parsedEmployeeId == null || !Number.isInteger(parsedEmployeeId)) {
+      return res.status(400).json({ error: 'A valid employeeId is required' })
+    }
+    let employeeQuery;
+    let params;
+
+    if (req.user.role === 'employee') {
+      employeeQuery = 'SELECT employee_id FROM employees WHERE employee_id = $1 AND user_id = $2';
+      params = [parsedEmployeeId, req.user.user_id];
+    } else {
+      employeeQuery = `SELECT e.employee_id
+                       FROM employees e
+                       JOIN businesses b ON e.business_id = b.business_id
+                       WHERE e.employee_id = $1 AND b.user_id = $2`;
+      params = [parsedEmployeeId, req.user.user_id];
+    }
+
+    const employeeResult = await db.query(employeeQuery, params);
+    if (!employeeResult.rows.length) {
+      return res.status(403).json({ error: 'Not authorized to view these payslips' });
+    }
+
+    const result = await db.query(
+      `SELECT p.*, u.first_name, u.last_name
+       FROM payslips p
+       JOIN employees e ON p.employee_id = e.employee_id
+       JOIN users u ON e.user_id = u.user_id
+       WHERE p.employee_id = $1
+       ORDER BY p.pay_period_end DESC, p.payslip_id DESC`,
+      [parsedEmployeeId]
+    );
+
+    res.json({ payslips: result.rows });
+  } catch (error) {
+    sendError(res, 500, 'Could not load payslips', error)
+  }
 }
 
-// GENERATE PAYSLIP PDF  (on request) //
+// generates a payslip PDF from requested data
 async function generatePayslipPDFFromRequest(req, res) {
   try {
     const {
@@ -283,30 +489,58 @@ async function generatePayslipPDFFromRequest(req, res) {
       payPeriodStart,
       payPeriodEnd,
       employmentType,
+      shifts,
+      publicHolidayRegion,
     } = req.body;
+    const hourlyRateNumber = toFiniteNumber(hourlyRate)
+    const hoursWorkedNumber = toFiniteNumber(hoursWorked)
+    const kiwiSaverNumber = kiwisaverRate == null || kiwisaverRate === ''
+      ? null
+      : toFiniteNumber(kiwisaverRate)
 
-    if (!firstName || !lastName || !hourlyRate || !hoursWorked || !payPeriodStart || !payPeriodEnd) {
+    if (
+      !String(firstName || '').trim()
+      || !String(lastName || '').trim()
+      || hourlyRateNumber == null
+      || hoursWorkedNumber == null
+      || !isValidDateRange(payPeriodStart, payPeriodEnd)
+    ) {
       return res.status(400).json({
-        error: 'firstName, lastName, hourlyRate, hoursWorked, payPeriodStart and payPeriodEnd are required'
+        error: 'firstName, lastName, hourlyRate, hoursWorked and a valid pay period are required'
       });
     }
 
+    if (hourlyRateNumber <= 0 || hoursWorkedNumber < 0) {
+      return res.status(400).json({ error: 'Hourly rate and hours worked must be valid positive values' })
+    }
+
+    if (kiwiSaverNumber != null && (kiwiSaverNumber < 0 || kiwiSaverNumber > 10)) {
+      return res.status(400).json({ error: 'KiwiSaver rate must be between 0 and 10 percent' })
+    }
+
+    if (!['permanent', 'casual'].includes(employmentType || 'permanent')) {
+      return res.status(400).json({ error: 'Employment type must be permanent or casual' })
+    }
+
     const engineEmployee = {
-      hourlyRate: parseFloat(hourlyRate),
+      hourlyRate: hourlyRateNumber,
       employmentType: employmentType || 'permanent',
       wageType: 'adult',
       usualDaysPerWeek: 5,
       taxCode: taxCode || 'M',
-      kiwisaverRate: kiwisaverRate != null && kiwisaverRate !== '' ? parseFloat(kiwisaverRate) : null,
+      kiwisaverRate: kiwiSaverNumber,
     };
-
+    // TODO: replace the Canterbury fallback with the business region setting.
+    const holidayRegion = String(publicHolidayRegion || 'Canterbury')
+    const { regularHours, publicHolidays } =
+      calculateShiftHours(shifts, holidayRegion, hoursWorkedNumber)
     const enginePayPeriod = {
-      regularHours: parseFloat(hoursWorked),
+      regularHours,
       overtimeHours: 0,
-      publicHolidays: [],
+      publicHolidays,
       leaveDaysTaken: 0,
-      owp: parseFloat(hourlyRate) * 40,
-      awe: parseFloat(hourlyRate) * 40,
+      owp: hourlyRateNumber * 40,
+      awe: hourlyRateNumber * 40,
     };
 
     let result;
@@ -316,53 +550,33 @@ async function generatePayslipPDFFromRequest(req, res) {
       return res.status(400).json({ error: wageError.message });
     }
 
-    const payslipData = {
-      business: {
-        businessName: businessName || '',
-      },
-      employee: {
-        firstName,
-        lastName,
-        address,
-        hourlyRate: parseFloat(hourlyRate),
-        taxCode: taxCode || 'M',
-        irdNumber,
-      },
-      period: {
-        start: payPeriodStart,
-        end: payPeriodEnd,
-      },
-      payPeriodInput: {
-        regularHours: parseFloat(hoursWorked),
-      },
-      engineOutput: {
-        regPay: result.regPay,
-        totalHolidayPay: result.totalHolidayPay,
-        leavePay: result.leavePay,
-        holidayPayAddition: result.holidayPayAddition,
-        employmentType: employmentType || 'permanent',
-        grossPay: result.grossPay,
-        payeTax: result.payeTax,
-        kiwisaverEmployee: result.kiwisaverEmployee,
-        kiwisaverEmployer: result.kiwisaverEmployer,
-        totalDeductions: result.totalDeductions,
-        netPay: result.netPay,
-      },
-      ytdEarnings: {
-        gross: 0,
-        paye: 0,
-        kiwisaver: 0,
-      },
-    };
+    const payslipData = buildPayslipData({
+      businessName,
+      firstName,
+      lastName,
+      address,
+      hourlyRate: hourlyRateNumber,
+      taxCode: taxCode || 'M',
+      irdNumber,
+      payPeriodStart,
+      payPeriodEnd,
+      regularHours,
+      result,
+      employmentType: employmentType || 'permanent',
+    })
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=payslip-${lastName}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=payslip-${safeDownloadName(lastName)}.pdf`);
 
     generatePayslipPDF(payslipData, res);
 
   } catch (error) {
-    console.error('generatePayslipPDFFromRequest error:', error.message);
-    res.status(500).json({ error: error.message });
+    if (!res.headersSent) {
+      sendError(res, 500, 'Could not generate the payslip', error)
+    } else {
+      console.error('generatePayslipPDF stream failed', error)
+      res.end()
+    }
   }
 }
 
