@@ -14,6 +14,9 @@ const {
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+const { protect } = require('../middleware/authMiddleware');
+
+router.use(protect);
 
 // Uploads CSV file to generate analytics (forecast + anomaly detection)
 router.post('/upload', upload.single('file'), uploadCsv);

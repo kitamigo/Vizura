@@ -5,6 +5,9 @@ const {
 } = require('../controllers/nlqController');
 
 const router = express.Router();
+const { protect } = require('../middleware/authMiddleware');
+
+router.use(protect);
 
 // Submits an nlq against the uploaded dataset
 router.post('/query', queryNlq);
