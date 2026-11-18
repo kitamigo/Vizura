@@ -6,14 +6,18 @@ function LoginForm({ onSubmit }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const handleSubmit = (e) => {
     e.preventDefault()
-
-    onSubmit({
-      email,
-      password
-    })
+    setErrorMessage('')
+    setIsSubmitting(true)
+    Promise.resolve(onSubmit({ email, password }))
+      .catch((error) => {
+        setErrorMessage(error?.response?.data?.message || 'Unable to sign in. Please check your details and try again.')
+      })
+      .finally(() => setIsSubmitting(false))
   }
 
   return (
@@ -86,10 +90,22 @@ function LoginForm({ onSubmit }) {
         {/* Login Button */}
         <button
           type="submit"
-          className="w-full cursor-pointer bg-blue-700 text-white py-3 rounded-xl font-medium hover:bg-blue-800 transition-colors"
+          disabled={isSubmitting}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 bg-blue-700 py-3 text-white rounded-xl font-medium hover:bg-blue-800 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
         >
-          Sign In
+          {isSubmitting ? (
+            <>
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />
+              Signing in...
+            </>
+          ) : 'Sign In'}
         </button>
+
+        {errorMessage && (
+          <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+            {errorMessage}
+          </p>
+        )}
 
       </form>
 

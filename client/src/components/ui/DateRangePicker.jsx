@@ -1,6 +1,12 @@
 import { Datepicker } from "flowbite-react";
 
-export function DateRangePicker({ startDate, endDate, onRangeChange }) {
+export function DateRangePicker({
+  startDate,
+  endDate,
+  onRangeChange,
+  availableStartDate,
+  availableEndDate,
+}) {
   const today = new Date();
   const datepickerTheme = {
     root: {
@@ -44,7 +50,8 @@ export function DateRangePicker({ startDate, endDate, onRangeChange }) {
           theme={datepickerTheme}
           value={startDate || null}
           onChange={handleStartChange}
-          maxDate={endDate || today}
+          minDate={availableStartDate || undefined}
+          maxDate={endDate || availableEndDate || today}
           showTodayButton
           placeholder="Select start date"
         />
@@ -59,7 +66,7 @@ export function DateRangePicker({ startDate, endDate, onRangeChange }) {
           value={endDate || null}
           onChange={handleEndChange}
           minDate={startDate || undefined}
-          maxDate={new Date()}
+          maxDate={availableEndDate || new Date()}
           showTodayButton
           placeholder="Select end date"
         />

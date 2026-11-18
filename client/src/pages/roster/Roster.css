@@ -50,6 +50,72 @@
     box-shadow: inset 0 1px 2px rgb(14 116 144 / 6%);
 }
 
+.roster-calendar-panel {
+    display: flex;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #bae6fd;
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 80%);
+}
+
+.roster-week-grid {
+    display: grid;
+    min-width: 760px;
+    grid-template-columns: repeat(7, minmax(108px, 1fr));
+    min-height: 100%;
+}
+
+.roster-week-day {
+    min-height: 28rem;
+    border-right: 1px solid #e0f2fe;
+}
+
+.roster-week-day:last-child {
+    border-right: none;
+}
+
+.roster-week-date {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    border: 0;
+    border-bottom: 1px solid #e0f2fe;
+    background: #f0f9ff;
+    color: #0369a1;
+    cursor: pointer;
+    padding: 0.65rem 0.55rem;
+}
+
+.roster-week-date strong,
+.roster-week-date span {
+    display: block;
+}
+
+.roster-week-date span {
+    font-size: 0.68rem;
+}
+
+.roster-week-shifts {
+    display: grid;
+    align-content: start;
+    gap: 0.35rem;
+    padding: 0.45rem;
+}
+
+.roster-week-shift {
+    display: grid;
+    border: 1px solid #7dd3fc;
+    border-radius: 0.45rem;
+    background: #e0f2fe;
+    color: #1e3a8a;
+    padding: 0.45rem;
+    text-align: left;
+}
+
 .roster-primary-button,
 .roster-secondary-button {
     border-radius: 0.65rem;
@@ -548,4 +614,8 @@ html.dark .roster-time-select {
     .roster-details-grid {
         grid-template-columns: 1fr;
     }
+}
+.roster-schedule .e-today,
+.roster-schedule .e-toolbar-item.e-today {
+    display: none !important;
 }

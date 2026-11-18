@@ -86,19 +86,6 @@ function AnalyticsShell({ dateRange, setDateRange }) {
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pt-2 pb-4 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="relative z-10 space-y-6">
-        <section className="flex flex-col gap-4 border-y border-sky-200/70 bg-white/85 px-4 pb-5 pt-0 shadow-none backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-slate-900/35 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-200/90">
-              Analytics overview
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50/90 px-4 py-3 text-sm text-sky-900 shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:text-sky-50">
-            <span className="h-2.5 w-2.5 rounded-full bg-cyan-500 shadow-[0_0_12px_rgba(14,165,233,0.6)] dark:bg-cyan-300 dark:shadow-[0_0_12px_rgba(103,232,249,0.95)]" />
-            Current range: {rangeLbl}
-          </div>
-        </section>
-
         <section className="grid gap-4 lg:grid-cols-3">
           <article className="relative z-50 overflow-visible rounded-[26px] border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none">
             <div className="flex items-center justify-between gap-4">
@@ -111,6 +98,20 @@ function AnalyticsShell({ dateRange, setDateRange }) {
             </div>
 
             <div className="relative z-50 mt-4 overflow-visible">
+              {availableRangeLbl ? (
+                <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2.5 dark:border-white/10 dark:bg-sky-950/20">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                    Available dates
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-sky-800 dark:text-sky-200">
+                    {uploadedFileName || 'Selected CSV'}: {availableRangeLbl}
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-3 rounded-xl border border-dashed border-sky-200 px-3 py-2.5 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
+                  Upload or select a CSV to show available dates.
+                </div>
+              )}
               <DatePicker
                 startDate={dateRange.startDate}
                 endDate={dateRange.endDate}
@@ -118,11 +119,6 @@ function AnalyticsShell({ dateRange, setDateRange }) {
                 availableStartDate={availableDates.start}
                 availableEndDate={availableDates.end}
               />
-              {availableRangeLbl ? (
-                <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  {uploadedFileName || 'Uploaded CSV'} - Date range: {availableRangeLbl}
-                </p>
-              ) : null}
             </div>
           </article>
 

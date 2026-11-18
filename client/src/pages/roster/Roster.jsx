@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useRef } from 'react'
 import {
   ScheduleComponent,
+  ViewsDirective,
+  ViewDirective,
   Inject,
   TimelineViews,
   TimelineMonth,
+  Day,
+  Week,
   DragAndDrop,
   Resize,
 } from '@syncfusion/ej2-react-schedule'
@@ -21,10 +26,15 @@ const mondayOf = (date) => {
   return value
 }
 
+const dateValue = (date) => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0'),
+].join('-')
+
 const hoursBetween = (start, end) => (end - start) / 36e5
 const currencyFormatter = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
-const shortDateFormatter = new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short' })
-const dateFormatter = new Intl.DateTimeFormat('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
+
 const defaultPeriods = [
   { id: 'morning', label: 'Morning', start: '06:00', end: '11:59' },
   { id: 'afternoon', label: 'Afternoon', start: '12:00', end: '17:59' },
@@ -33,37 +43,26 @@ const defaultPeriods = [
 
 const readPeriods = () => {
   try {
-    const periods = JSON.parse(localStorage.getItem('vizura-roster-day-periods') || 'null')
-    return Array.isArray(periods) && periods.length === 3 ? periods : defaultPeriods
+    const value = JSON.parse(localStorage.getItem('vizura-roster-day-periods') || 'null')
+    return Array.isArray(value) && value.length === 3 ? value : defaultPeriods
   } catch {
     return defaultPeriods
   }
 }
-
-const dateValue = (date) => [
-  date.getFullYear(),
-  String(date.getMonth() + 1).padStart(2, '0'),
-  String(date.getDate()).padStart(2, '0'),
-].join('-')
 
 export default function Rostering() {
   const scheduler = useRef(null)
   const { user } = useAuth()
   const [employees, setEmployees] = useState([])
   const [sections, setSections] = useState([])
-  const [templates, setTemplates] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('vizura-roster-templates') || '[]') }
-    catch { return [] }
-  })
+  const [shifts, setShifts] = useState(readDemoShifts)
   const [range, setRange] = useState(() => {
     const start = mondayOf(new Date())
     const end = new Date(start)
     end.setDate(end.getDate() + 6)
     return { start, end }
   })
-  const [shifts, setShifts] = useState(readDemoShifts)
   const [isDayView, setIsDayView] = useState(false)
-  const [scheduleView, setScheduleView] = useState('week')
   const [dayViewDate, setDayViewDate] = useState(new Date())
   const [dayPeriods, setDayPeriods] = useState(readPeriods)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null)
@@ -114,13 +113,12 @@ export default function Rostering() {
 
   useEffect(() => writeDemoShifts(shifts), [shifts])
   useEffect(() => localStorage.setItem('vizura-roster-day-periods', JSON.stringify(dayPeriods)), [dayPeriods])
-  useEffect(() => localStorage.setItem('vizura-roster-templates', JSON.stringify(templates)), [templates])
-  useEffect(() => scheduler.current?.refresh(), [shifts, employees, selectedEmployeeId])
 
   const hoursByEmployee = useMemo(() => {
     const totals = {}
     shifts.forEach((shift) => {
-      if (shift.StartTime >= range.start && shift.StartTime <= range.end) {
+      const shiftDate = new Date(shift.StartTime)
+      if (shiftDate >= range.start && shiftDate <= range.end) {
         totals[shift.EmployeeId] = (totals[shift.EmployeeId] ?? 0) + hoursBetween(shift.StartTime, shift.EndTime)
       }
     })
@@ -129,12 +127,11 @@ export default function Rostering() {
 
   const visibleEmployees = employees
   const totalHours = Object.values(hoursByEmployee).reduce((total, hours) => total + hours, 0)
-  const hasDrafts = shifts.some((shift) => !shift.IsPublished)
-  const rangeLabel = `${shortDateFormatter.format(range.start)} - ${dateFormatter.format(range.end)}`
   const labourCost = shifts.reduce((total, shift) => {
     const employee = employees.find((record) => record.id === shift.EmployeeId)
     return total + hoursBetween(shift.StartTime, shift.EndTime) * (employee?.hourlyRate || 0)
   }, 0)
+  const hasDrafts = shifts.some((shift) => !shift.IsPublished)
   const userPosition = String(user?.position || user?.role || '').toLowerCase()
   const isAdmin = !user || ['admin', 'administrator', 'owner', 'manager'].includes(userPosition)
 
@@ -142,23 +139,7 @@ export default function Rostering() {
     const selected = new Date(date)
     selected.setHours(0, 0, 0, 0)
     setDayViewDate(selected)
-    setScheduleView('day')
-    setRange({
-      start: mondayOf(selected),
-      end: new Date(mondayOf(selected).setDate(mondayOf(selected).getDate() + 6)),
-    })
     setIsDayView(true)
-  }
-
-  const openScheduleView = (view) => {
-    if (view === 'day') {
-      openDayView(dayViewDate)
-      return
-    }
-
-    setIsDayView(false)
-    setScheduleView(view)
-    scheduler.current?.changeView(view === 'month' ? 'TimelineMonth' : 'TimelineWeek')
   }
 
   const openShiftForm = () => {
@@ -173,11 +154,6 @@ export default function Rostering() {
     })
     setShiftFormError('')
     setIsShiftFormOpen(true)
-  }
-
-  const closeShiftForm = () => {
-    setIsShiftFormOpen(false)
-    setShiftFormError('')
   }
 
   const updateShiftForm = (field) => (event) => {
@@ -215,17 +191,9 @@ export default function Rostering() {
         IsPublished: false,
       })
     }
-    if (shiftForm.templateName.trim()) {
-      setTemplates((current) => [...current, {
-        id: Date.now(),
-        name: shiftForm.templateName.trim(),
-        startTime: shiftForm.startTime,
-        endTime: shiftForm.endTime,
-        section: shiftForm.section,
-      }])
-    }
     setShifts((current) => [...current, ...additions])
-    closeShiftForm()
+    setIsShiftFormOpen(false)
+    setError('')
   }
 
   const publishWeek = () => {
@@ -248,12 +216,16 @@ export default function Rostering() {
     event.preventDefault()
     const employeeId = Number(event.dataTransfer.getData('application/vizura-employee'))
     if (!employeeId) return
+
     const appointment = event.target.closest?.('[data-roster-shift-id]')
     if (appointment) {
       const shiftId = Number(appointment.dataset.rosterShiftId)
-      setShifts((current) => current.map((shift) => shift.Id === shiftId ? { ...shift, EmployeeId: employeeId } : shift))
+      setShifts((current) => current.map((shift) => (
+        shift.Id === shiftId ? { ...shift, EmployeeId: employeeId } : shift
+      )))
       return
     }
+
     const cellDetails = scheduler.current?.getCellDetails(event.target)
     if (!cellDetails?.startTime) {
       setError('Drop the employee onto an available calendar time.')
@@ -305,40 +277,13 @@ export default function Rostering() {
     setPendingEmployeeShift(null)
   }
 
-  const eventTemplate = (props) => {
-    const employee = employees.find((record) => record.id === props.EmployeeId)
-    return (
-      <div className="roster-event-template px-1 text-xs leading-tight">
-        {props.Section && <strong className="block truncate">{props.Section}</strong>}
-        {employee?.name
-          ? <strong className="block truncate">{employee.name}</strong>
-          : <strong className="roster-assign-label">Assign employee</strong>}
-        <span>{props.StartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {props.EndTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-      </div>
-    )
-  }
-
-  const onEventRendered = (args) => {
-    args.element.dataset.rosterShiftId = String(args.data.Id)
-    const unallocated = !args.data.EmployeeId
-    const isSelectedEmployee = selectedEmployeeId !== null && args.data.EmployeeId === selectedEmployeeId
-    args.element.classList.toggle('roster-selected-schedule-shift', isSelectedEmployee)
-    args.element.style.backgroundColor = unallocated ? '#fef3c7' : (args.data.IsPublished ? '#2563eb' : '#dbeafe')
-    args.element.style.color = unallocated ? '#92400e' : (args.data.IsPublished ? '#fff' : '#1e3a8a')
-    args.element.style.border = isSelectedEmployee
-      ? '3px solid #f59e0b'
-      : (unallocated ? '1px dashed #d97706' : (args.data.IsPublished ? 'none' : '1px dashed #2563eb'))
-    args.element.style.boxShadow = isSelectedEmployee ? '0 0 0 3px rgb(245 158 11 / 30%)' : ''
-  }
-
-  const loadTemplate = (templateId) => {
-    const template = templates.find((record) => record.id === Number(templateId))
-    if (template) setShiftForm((current) => ({ ...current, startTime: template.startTime, endTime: template.endTime, section: template.section }))
-  }
-
   const updatePeriod = (periodId, field, value) => {
-    setDayPeriods((current) => current.map((period) => period.id === periodId ? { ...period, [field]: value } : period))
+    setDayPeriods((current) => current.map((period) => (
+      period.id === periodId ? { ...period, [field]: value } : period
+    )))
   }
+
+  const rangeLabel = `${range.start.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })} - ${range.end.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
   return (
     <div className="roster-page bg-transparent p-4 sm:p-6">
@@ -358,22 +303,22 @@ export default function Rostering() {
         {error && <div role="alert" className="roster-alert mb-4">{error}</div>}
         <div className="roster-content-grid">
           <div
-            className="overflow-hidden rounded-xl border border-sky-200/80 bg-white/80"
+            className="roster-calendar-panel"
             onDragOver={(event) => event.preventDefault()}
             onDrop={onCalendarDrop}
           >
             <div className="roster-calendar-header">
               <div>
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Shift schedule</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Choose Day, Week or Month view.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Click a date to open the day view.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="roster-view-switcher" aria-label="Roster view">
-                  <button type="button" onClick={() => openScheduleView('day')} className={scheduleView === 'day' ? 'is-active' : ''}>Day</button>
-                  <button type="button" onClick={() => openScheduleView('week')} className={scheduleView === 'week' ? 'is-active' : ''}>Week</button>
-                  <button type="button" onClick={() => openScheduleView('month')} className={scheduleView === 'month' ? 'is-active' : ''}>Month</button>
-                </div>
-                {isAdmin && <button type="button" onClick={openShiftForm} className="roster-secondary-button">Add shift</button>}
+                {isDayView && (
+                  <button type="button" onClick={() => setIsDayView(false)} className="roster-secondary-button">Back to week</button>
+                )}
+                {isAdmin && (
+                  <button type="button" onClick={openShiftForm} className="roster-secondary-button">Add shift</button>
+                )}
                 <button type="button" onClick={publishWeek} disabled={busy || !hasDrafts} className="roster-primary-button">
                   {busy ? 'Saving...' : 'Publish roster'}
                 </button>
@@ -398,12 +343,11 @@ export default function Rostering() {
                   className="roster-schedule"
                   height="600px"
                   width="100%"
-                  currentView={scheduleView === 'month' ? 'TimelineMonth' : 'TimelineWeek'}
+                  currentView="TimelineWeek"
                   selectedDate={range.start}
                   firstDayOfWeek={1}
                   timeScale={{ enable: false }}
                   showQuickInfo={false}
-                  showHeaderBar={false}
                   rowAutoHeight
                   allowDragAndDrop
                   allowResizing
@@ -414,21 +358,54 @@ export default function Rostering() {
                   )}
                   eventSettings={{
                     dataSource: shifts,
-                    template: eventTemplate,
-                    fields: { id: 'Id', subject: { name: 'Subject', default: 'Shift' }, startTime: { name: 'StartTime' }, endTime: { name: 'EndTime' } },
+                    template: (props) => {
+                      const employee = employees.find((record) => record.id === props.EmployeeId)
+                      return (
+                        <div className="roster-event-template px-1 text-xs leading-tight">
+                          {props.Section && <strong className="block truncate">{props.Section}</strong>}
+                          {employee?.name
+                            ? <strong className="block truncate">{employee.name}</strong>
+                            : <strong className="roster-assign-label">Assign employee</strong>}
+                          <span>
+                            {props.StartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} -{' '}
+                            {props.EndTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      )
+                    },
+                    fields: {
+                      id: 'Id',
+                      subject: { name: 'Subject', default: 'Shift' },
+                      startTime: { name: 'StartTime' },
+                      endTime: { name: 'EndTime' },
+                    },
                   }}
-                  eventRendered={onEventRendered}
+                  eventRendered={(args) => {
+                    args.element.dataset.rosterShiftId = String(args.data.Id)
+                    const unallocated = !args.data.EmployeeId
+                    args.element.style.backgroundColor = unallocated ? '#fef3c7' : (args.data.IsPublished ? '#2563eb' : '#dbeafe')
+                    args.element.style.color = unallocated ? '#92400e' : (args.data.IsPublished ? '#fff' : '#1e3a8a')
+                    args.element.style.border = unallocated ? '1px dashed #d97706' : (args.data.IsPublished ? 'none' : '1px dashed #2563eb')
+                  }}
                   actionComplete={(args) => {
                     if (args.requestType === 'dateNavigate' || args.requestType === 'viewNavigate') {
                       const dates = scheduler.current?.getCurrentViewDates() || []
                       if (dates.length) setRange({ start: dates[0], end: dates[dates.length - 1] })
+                      if (args.requestType === 'viewNavigate' && scheduler.current?.currentView === 'Day') {
+                        openDayView(dates[0] || range.start)
+                      }
                     }
                   }}
                   actionBegin={(args) => {
                     if (args.requestType === 'eventSelect') setSelectedShift(args.data)
                   }}
                 >
-                  <Inject services={[TimelineViews, TimelineMonth, DragAndDrop, Resize]} />
+                  <ViewsDirective>
+                    <ViewDirective option="Day" displayName="Day view" />
+                    <ViewDirective option="TimelineWeek" displayName="Week view" />
+                    <ViewDirective option="TimelineMonth" displayName="Month view" />
+                  </ViewsDirective>
+                  <Inject services={[Day, Week, TimelineViews, TimelineMonth, DragAndDrop, Resize]} />
                 </ScheduleComponent>
               )}
             </div>
@@ -442,17 +419,16 @@ export default function Rostering() {
           />
         </div>
       </div>
-
       <AddShiftModal
         open={isShiftFormOpen}
         form={shiftForm}
         sections={sections}
         employees={visibleEmployees}
-        templates={templates}
-        onLoadTemplate={loadTemplate}
+        templates={[]}
+        onLoadTemplate={() => {}}
         error={shiftFormError}
         onChange={updateShiftForm}
-        onClose={closeShiftForm}
+        onClose={() => setIsShiftFormOpen(false)}
         onSubmit={addShift}
       />
       <DroppedShiftModal
