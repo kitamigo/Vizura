@@ -19,8 +19,11 @@ let latestCsvContent = null
 let latestDataPoints = []
 let latestCustomEvents = []
 
+function setActiveUpload(row, dataPoints) {
+  latestAnalyticsSnapshot = null
+  latestCsvContent = row.csv_content || null
   latestUpload = { fileName: row.file_name, uploadedAt: row.uploaded_at }
-  latestDataPoints = dataPoints
+  latestDataPoints = dataPoints || parseCsvToDataPoints(row.csv_content || '')
   latestCustomEvents = Array.isArray(row.custom_events) ? row.custom_events : []
 }
 
@@ -124,6 +127,7 @@ async function persistUpload(fileName, csvContent, forecastSnapshot, anomalySnap
 
 function getLatestCsvContent() {
   return latestCsvContent
+}
 
 function getLatestDataPoints() {
   return latestDataPoints
@@ -493,11 +497,12 @@ async function deleteUploadedFile(req, res) {
       clearActiveUpload()
 
       // activate the newest remaining upload
-      const { rowCount } = await db.query(
+      const { rows: remaining } = await db.query(
         `UPDATE analytics_uploads SET is_active = TRUE
-         WHERE id = (SELECT id FROM analytics_uploads ORDER BY uploaded_at DESC, id DESC LIMIT 1)`,
+         WHERE id = (SELECT id FROM analytics_uploads ORDER BY uploaded_at DESC, id DESC LIMIT 1)
+         RETURNING id`,
       )
-      if (rowCount) await loadActiveUploadFromDatabase()
+      if (remaining.length) await loadActiveUploadFromDatabase()
     }
 
     res.json({ deleted: true })
