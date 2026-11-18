@@ -6,15 +6,17 @@ const { generatePayslipPDF } = require('../utils/payslipPDF');
 async function createPayRun(req, res) {
   try {
     const { employeeIds, payPeriod } = req.body;
-    const { start, end, weeks } = payPeriod || {};
+    const { start, end } = payPeriod || {};
+    const normalizedEmployeeIds = normalizeEmployeeIds(employeeIds)
 
-    if (!employeeIds?.length || !start || !end || !weeks) {
+    if (!normalizedEmployeeIds.length || !isValidDateRange(start, end)) {
       return res.status(400).json({
-        error: 'employeeIds, payPeriod.start, payPeriod.end and payPeriod.weeks are required'
+        error: 'employeeIds and a valid payPeriod start/end date range are required'
       });
     }
 
-    // Gets business and region //
+
+    // gets business and region
     const bizResult = await db.query(
       'SELECT business_id, public_holiday_region FROM businesses WHERE user_id = $1',
       [req.user.user_id]
@@ -27,32 +29,45 @@ async function createPayRun(req, res) {
     const { business_id, public_holiday_region } = bizResult.rows[0];
     const region = public_holiday_region || 'Canterbury';
 
-        // Fetchs employees with tax and KiwiSaver details //
+    // fetchs employees with tax and KiwiSaver details
     const employeeResult = await db.query(
       `SELECT e.employee_id,
               u.first_name || ' ' || u.last_name AS name,
               e.hourly_rate,
               e.contract_type,
               e.tax_code,
-              e.kiwisaver_rate,
-              e.ird_number
+              e.kiwisaver_rate
        FROM employees e
        JOIN users u ON e.user_id = u.user_id
        WHERE e.employee_id = ANY($1) AND e.business_id = $2`,
-      [employeeIds, business_id]
+      [normalizedEmployeeIds, business_id]
     );
 
     if (!employeeResult.rows.length) {
       return res.status(404).json({ message: 'No matching employees found for this business' });
     }
 
-    // Fetchs shifts //
-    const shiftResult = await db.query(
+    const matchedIds = employeeResult.rows.map((employee) => employee.employee_id)
+    const skippedIds = normalizedEmployeeIds.filter((id) =>
+      !matchedIds.some((matchedId) => Number(matchedId) === Number(id))
+    )
+    if (skippedIds.length) {
+      return res.status(400).json({
+        error: 'Some employees do not belong to this business',
+        skippedEmployeeIds: skippedIds,
+      })
+    }
+
+    client = await db.connect()
+    await client.query('BEGIN')
+
+    // fetchs shifts
+    const shiftResult = await client.query(
       `SELECT employee_id, date, hours_worked
        FROM shifts
        WHERE employee_id = ANY($1)
          AND date >= $2 AND date <= $3`,
-      [employeeIds, start, end]
+      [matchedIds, start, end]
     );
 
     const allShifts = shiftResult.rows;
