@@ -19,6 +19,7 @@ let latestUpload = null
 let latestCsvContent = null
 let latestDataPoints = []
 let latestCustomEvents = []
+let inMemoryUploads = []
 
 function setActiveUpload(row, dataPoints) {
   latestAnalyticsSnapshot = null
@@ -108,22 +109,42 @@ async function loadActiveUploadFromDatabase() {
 loadActiveUploadFromDatabase()
 
 async function persistUpload(fileName, csvContent, forecastSnapshot, anomalySnapshot) {
-  await ensureUploadTable()
-  await db.query('UPDATE analytics_uploads SET is_active = FALSE')
-  await db.query(
-    `INSERT INTO analytics_uploads
-      (file_name, csv_content, forecast_snapshot, anomaly_snapshot, is_active)
-     VALUES ($1, $2, $3, $4, TRUE)`,
-    [fileName, csvContent, toJson(forecastSnapshot), toJson(anomalySnapshot)],
-  )
-  await db.query(
-    `DELETE FROM analytics_uploads
-     WHERE id IN (
-       SELECT id FROM analytics_uploads
-       ORDER BY uploaded_at DESC, id DESC
-       OFFSET ${MAX_STORED_UPLOADS}
-     )`,
-  )
+  const points = parseCsvToDataPoints(csvContent)
+  const upload = {
+    id: String(Date.now()),
+    fileName,
+    csvContent,
+    forecastSnapshot,
+    anomalySnapshot,
+    customEvents: [],
+    uploadedAt: new Date().toISOString(),
+    isActive: true,
+  }
+  inMemoryUploads = [
+    upload,
+    ...inMemoryUploads.map((item) => ({ ...item, isActive: false })),
+  ].slice(0, MAX_STORED_UPLOADS)
+
+  try {
+    await ensureUploadTable()
+    await db.query('UPDATE analytics_uploads SET is_active = FALSE')
+    await db.query(
+      `INSERT INTO analytics_uploads
+        (file_name, csv_content, forecast_snapshot, anomaly_snapshot, is_active)
+       VALUES ($1, $2, $3, $4, TRUE)`,
+      [fileName, csvContent, toJson(forecastSnapshot), toJson(anomalySnapshot)],
+    )
+    await db.query(
+      `DELETE FROM analytics_uploads
+       WHERE id IN (
+         SELECT id FROM analytics_uploads
+         ORDER BY uploaded_at DESC, id DESC
+         OFFSET ${MAX_STORED_UPLOADS}
+       )`,
+    )
+  } catch (error) {
+    console.warn('Analytics database unavailable; keeping upload in memory:', error.message)
+  }
 }
 
 function getLatestCsvContent() {
@@ -462,8 +483,21 @@ async function getUploadedFiles(req, res) {
 
     res.json({ uploads })
   } catch (error) {
-    console.error('getUploadedFiles error:', error.message)
-    res.status(500).json({ message: 'Could not load uploaded CSVs.', error: error.message })
+    console.warn('getUploadedFiles using memory fallback:', error.message)
+    const uploads = inMemoryUploads.map((row) => {
+      const points = parseCsvToDataPoints(row.csvContent)
+      return {
+        id: row.id,
+        fileName: row.fileName,
+        uploadedAt: row.uploadedAt,
+        isActive: row.isActive,
+        customEvents: Array.isArray(row.customEvents) ? row.customEvents : [],
+        rowCount: points.length,
+        startDate: points[0]?.date ?? null,
+        endDate: points[points.length - 1]?.date ?? null,
+      }
+    })
+    res.json({ uploads })
   }
 }
 
@@ -510,8 +544,29 @@ async function activateUploadedFile(req, res) {
 
     res.json(latestAnalyticsSnapshot)
   } catch (error) {
-    console.error('activateUploadedFile error:', error.message)
-    res.status(500).json({ message: 'Could not activate uploaded CSV.', error: error.message })
+    const row = inMemoryUploads.find((item) => item.id === req.params.id)
+    if (!row) {
+      return res.status(404).json({ message: 'Uploaded CSV not found.' })
+    }
+    inMemoryUploads = inMemoryUploads.map((item) => ({ ...item, isActive: item.id === row.id }))
+    setActiveUpload({
+      file_name: row.fileName,
+      csv_content: row.csvContent,
+      uploaded_at: row.uploadedAt,
+      custom_events: row.customEvents,
+    })
+    let forecastSnapshot = row.forecastSnapshot
+    let anomalySnapshot = row.anomalySnapshot
+    if (!forecastSnapshot || !anomalySnapshot) {
+      ;[forecastSnapshot, anomalySnapshot] = await runAnalytics(latestDataPoints)
+    }
+    latestAnalyticsSnapshot = {
+      forecast: forecastSnapshot || emptyForecast(),
+      anomalies: anomalySnapshot || emptyAnomalies(),
+      fileName: row.fileName,
+      uploadedAt: row.uploadedAt,
+    }
+    res.json(latestAnalyticsSnapshot)
   }
 }
 
@@ -557,15 +612,29 @@ async function saveCustomEvent(req, res) {
 
 async function deleteUploadedFile(req, res) {
   try {
-    const { rows } = await db.query(
+    let deleted = null
+    try {
+      const { rows } = await db.query(
       `DELETE FROM analytics_uploads WHERE id = $1 RETURNING id, is_active`,
       [req.params.id],
-    )
-    if (!rows.length) {
+      )
+      deleted = rows[0] || null
+    } catch (error) {
+      const memoryRow = inMemoryUploads.find((item) => item.id === req.params.id)
+      if (memoryRow) deleted = { id: memoryRow.id, is_active: memoryRow.isActive }
+    }
+    if (!deleted) {
+      const memoryRow = inMemoryUploads.find((item) => item.id === req.params.id)
+      if (memoryRow) deleted = { id: memoryRow.id, is_active: memoryRow.isActive }
+    }
+    if (!deleted) {
       return res.status(404).json({ message: 'Uploaded CSV not found.' })
     }
 
-    if (rows[0].is_active) {
+    inMemoryUploads = inMemoryUploads
+      .filter((item) => item.id !== req.params.id)
+      .map((item, index) => ({ ...item, isActive: index === 0 }))
+    if (deleted.is_active) {
       clearActiveUpload()
 
       // activate the newest remaining upload
@@ -595,19 +664,33 @@ async function uploadCsv(req, res) {
   const csvContent = req.file.buffer.toString('utf8')
   const dataPoints = parseCsvToDataPoints(csvContent)
 
-  await ensureUploadTable()
-  const duplicateName = await db.query(
-    `SELECT id FROM analytics_uploads
-     WHERE LOWER(BTRIM(file_name)) = LOWER(BTRIM($1))
-        OR csv_content = $2
-     LIMIT 1`,
-    [fileName, csvContent],
+  const duplicateMemoryUpload = inMemoryUploads.find((item) =>
+    item.fileName.toLowerCase() === fileName.toLowerCase() || item.csvContent === csvContent,
   )
-  if (duplicateName.rows.length) {
+  if (duplicateMemoryUpload) {
     return res.status(409).json({
       error: 'This CSV has already been uploaded. Choose a different file or select the existing CSV.',
       duplicateFileName: fileName,
     })
+  }
+
+  try {
+    await ensureUploadTable()
+    const duplicateName = await db.query(
+      `SELECT id FROM analytics_uploads
+       WHERE LOWER(BTRIM(file_name)) = LOWER(BTRIM($1))
+          OR csv_content = $2
+       LIMIT 1`,
+      [fileName, csvContent],
+    )
+    if (duplicateName.rows.length) {
+      return res.status(409).json({
+        error: 'This CSV has already been uploaded. Choose a different file or select the existing CSV.',
+        duplicateFileName: fileName,
+      })
+    }
+  } catch (error) {
+    console.warn('Analytics duplicate check using memory because database is unavailable:', error.message)
   }
 
   latestCsvContent = csvContent

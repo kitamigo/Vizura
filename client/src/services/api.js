@@ -2,7 +2,9 @@ import axios from 'axios'
 
 // creates the shared api client
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
-const isLocalDevelopment = window.location.hostname === 'localhost'
+const isLocalDevelopment =
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
 const baseURL = configuredApiUrl || (
   isLocalDevelopment
     ? 'http://localhost:5000/api'
