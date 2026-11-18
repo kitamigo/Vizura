@@ -530,7 +530,8 @@ async function generatePayslipPDFFromRequest(req, res) {
       taxCode: taxCode || 'M',
       kiwisaverRate: kiwiSaverNumber,
     };
-    // TODO: replace the Canterbury fallback with the business region setting.
+    
+    // TEMP PLACEHOLDERS 
     const holidayRegion = String(publicHolidayRegion || 'Canterbury')
     const { regularHours, publicHolidays } =
       calculateShiftHours(shifts, holidayRegion, hoursWorkedNumber)

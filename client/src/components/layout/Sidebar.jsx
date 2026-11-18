@@ -26,8 +26,8 @@ const navGroups = [
 function Sidebar({ collapsed, onToggle }) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const userName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.name || 'User'
-  const userPosition = user?.position || user?.role || 'Member'
+  const userName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.name || (user ? 'User' : 'Guest')
+  const userPosition = user?.position || user?.role || (user ? 'Member' : 'Public preview')
   const userInitials = userName
     .split(' ')
     .filter(Boolean)
@@ -149,21 +149,36 @@ function Sidebar({ collapsed, onToggle }) {
             <p className="truncate pr-10 text-xs leading-tight text-slate-600 dark:text-slate-400">
               {userPosition.charAt(0).toUpperCase() + userPosition.slice(1)}
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                logout()
-                navigate('/login', { replace: true })
-              }}
-              aria-label="Log out"
-              title="Log out"
-              tabIndex={collapsed ? -1 : 0}
-              className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-rose-200 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-500/20 dark:hover:text-rose-400"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-xl leading-none">
-                logout
-              </span>
-            </button>
+            {user ? (
+              <button
+                type="button"
+                onClick={() => {
+                  logout()
+                  navigate('/login', { replace: true })
+                }}
+                aria-label="Log out"
+                title="Log out"
+                tabIndex={collapsed ? -1 : 0}
+                className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-rose-200 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-500/20 dark:hover:text-rose-400"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-xl leading-none">
+                  logout
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate('/login', { replace: true })}
+                aria-label="Log in"
+                title="Log in"
+                tabIndex={collapsed ? -1 : 0}
+                className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-slate-600 transition-colors hover:bg-sky-200 hover:text-sky-700 dark:text-slate-400 dark:hover:bg-sky-500/20 dark:hover:text-sky-400"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-xl leading-none">
+                  login
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </div>

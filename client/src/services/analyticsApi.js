@@ -23,6 +23,26 @@ export async function uploadAnalyticsCsv(formData) {
   return data
 }
 
+export async function fetchUploadedCsvs() {
+  const { data } = await api.get('/analytics/uploads')
+  return data
+}
+
+export async function activateUploadedCsv(id) {
+  const { data } = await api.post(`/analytics/uploads/${id}/activate`)
+  return data
+}
+
+export async function saveAnalyticsEvent(date, name) {
+  const { data } = await api.post('/analytics/uploads/events', { date, name })
+  return data
+}
+
+export async function deleteUploadedCsv(id) {
+  const { data } = await api.delete(`/analytics/uploads/${id}`)
+  return data
+}
+
 // NLQ endpoints
 export async function runNlqQuery(payload) {
   const { data } = await api.post('/nlq/query', payload)

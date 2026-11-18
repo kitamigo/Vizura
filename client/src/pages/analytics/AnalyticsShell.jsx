@@ -43,12 +43,35 @@ function AnalyticsShell({ dateRange, setDateRange }) {
     submitQuery,
     loadHistoryQuery,
     uploadCsv,
+    uploadedFileName,
+    uploadedCsvs,
+    activatingCsvId,
+    activateCsv,
   } = useAnalyticsData(dateRange)
 
   const rangeLbl =
     dateRange.startDate || dateRange.endDate
       ? `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`
       : 'Select a date range to focus the dashboard'
+
+  const availableDates = useMemo(() => {
+    if (!revenueTrendPts.length) return { start: null, end: null }
+
+    const dates = revenueTrendPts
+      .map((point) => point.date)
+      .filter(Boolean)
+      .sort()
+
+    return {
+      start: dates.length ? new Date(`${dates[0]}T00:00:00`) : null,
+      end: dates.length ? new Date(`${dates[dates.length - 1]}T00:00:00`) : null,
+    }
+  }, [revenueTrendPts])
+
+  const availableRangeLbl =
+    availableDates.start && availableDates.end
+      ? `${formatDDMMYY(availableDates.start.toISOString().split('T')[0])} - ${formatDDMMYY(availableDates.end.toISOString().split('T')[0])}`
+      : null
 
   const prompts = useMemo(
     () => [
@@ -92,7 +115,14 @@ function AnalyticsShell({ dateRange, setDateRange }) {
                 startDate={dateRange.startDate}
                 endDate={dateRange.endDate}
                 onRangeChange={setDateRange}
+                availableStartDate={availableDates.start}
+                availableEndDate={availableDates.end}
               />
+              {availableRangeLbl ? (
+                <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {uploadedFileName || 'Uploaded CSV'} - Date range: {availableRangeLbl}
+                </p>
+              ) : null}
             </div>
           </article>
 
@@ -102,27 +132,74 @@ function AnalyticsShell({ dateRange, setDateRange }) {
               Upload a CSV to refresh the analytics inputs.
             </p>
 
-            <label className="mt-4 block cursor-pointer rounded-2xl border border-dashed border-sky-300 bg-sky-50/80 p-4 text-sm text-sky-800 transition hover:bg-sky-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-900/60">
-              <span className="block font-medium">Choose CSV file</span>
-              <span className="mt-1 block text-xs text-sky-700/80 dark:text-slate-400">
-                {csvFile ? csvFile.name : 'No file selected yet'}
-              </span>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                className="sr-only"
-                onChange={(event) => setCsvFile(event.target.files?.[0] || null)}
-              />
-            </label>
+            <div className="mt-4 grid grid-cols-2 items-start gap-3">
+              <div>
+                <label className="block cursor-pointer rounded-2xl border border-dashed border-sky-300 bg-sky-50/80 p-2 text-sm text-sky-800 transition hover:bg-sky-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-900/60">
+                  <span className="block font-medium">Choose CSV file</span>
+                  <span className="mt-1 block truncate text-xs text-sky-700/80 dark:text-slate-400">
+                    {csvFile ? csvFile.name : 'No file selected yet'}
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="sr-only"
+                    onChange={(event) => setCsvFile(event.target.files?.[0] || null)}
+                  />
+                </label>
 
-            <Button
-              className={`mt-4 w-full ${analyticsButtonClass}`}
-              size="md"
-              onClick={() => uploadCsv(csvFile)}
-              disabled={loadingUpload}
-            >
-              {loadingUpload ? 'Uploading...' : 'Upload CSV'}
-            </Button>
+                <Button
+                  className={`mt-3 w-full ${analyticsButtonClass}`}
+                  size="md"
+                  onClick={() => uploadCsv(csvFile)}
+                  disabled={loadingUpload || uploadedCsvs.length >= 5}
+                >
+                  {loadingUpload ? 'Uploading...' : uploadedCsvs.length >= 5 ? 'CSV limit' : 'Upload'}
+                </Button>
+              </div>
+
+              <div className="min-w-0 border-l border-sky-100 pl-3 dark:border-white/10">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    Saved Data
+                  </h3>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {uploadedCsvs.length}/5
+                  </span>
+                </div>
+
+                {uploadedCsvs.length ? (
+                  <div className="mt-2 max-h-[140px] space-y-2 overflow-y-auto">
+                    {uploadedCsvs.map((upload) => (
+                      <button
+                        key={upload.id}
+                        type="button"
+                        onClick={() => activateCsv(upload.id)}
+                        disabled={activatingCsvId === upload.id}
+                        className={`w-full rounded-xl border px-3 py-2 text-left transition ${
+                          upload.isActive
+                            ? 'border-sky-400 bg-sky-100 text-sky-900 dark:border-sky-500 dark:bg-sky-900/40 dark:text-sky-100'
+                            : 'border-sky-100 bg-white text-slate-700 hover:border-sky-300 hover:bg-sky-50 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-900'
+                        }`}
+                      >
+                        <span className="block truncate text-sm font-medium">
+                          {activatingCsvId === upload.id ? 'Activating...' : upload.fileName}
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                          {upload.rowCount} rows
+                          {upload.startDate && upload.endDate
+                            ? ` · ${formatDDMMYY(upload.startDate)}–${formatDDMMYY(upload.endDate)}`
+                            : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Upload a CSV to get started.
+                  </p>
+                )}
+              </div>
+            </div>
             {statusMsg ? (
               <p className="mt-3 text-sm font-medium text-emerald-700 dark:text-emerald-300" role="status">
                 {statusMsg}
@@ -133,12 +210,13 @@ function AnalyticsShell({ dateRange, setDateRange }) {
                 {errorMsg}
               </p>
             ) : null}
+
           </article>
 
           <article className="rounded-[26px] border border-sky-200/80 bg-white/80 p-4 shadow-lg shadow-sky-200/40 backdrop-blur-md transition-colors duration-200 dark:border-white/15 dark:bg-white/10 dark:shadow-none">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Anomaly flags</h2>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Anomalies</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-sky-100/75">
-              Dates and types flagged from the anomaly service.
+              Dates and types of anomalies from your data.
             </p>
             <div className="mt-4 flex items-center gap-2">
               <Button size="sm" className={analyticsButtonClass} onClick={refreshAnomalies} disabled={loadingAnomalies || !hasData}>
@@ -174,7 +252,7 @@ function AnalyticsShell({ dateRange, setDateRange }) {
               </div>
               {!anomalies.length ? (
                 <div className="border-t border-sky-100 bg-white px-4 py-3 text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-300">
-                  Upload a CSV to generate anomaly flags from your model.
+                  Upload a CSV to get started.
                 </div>
               ) : null}
             </div>

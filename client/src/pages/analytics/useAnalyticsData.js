@@ -4,34 +4,47 @@ import {
   fetchNlqHistory,
   fetchRevenueTrend,
   fetchSavedForecast,
+  fetchUploadedCsvs,
+  activateUploadedCsv,
+  saveAnalyticsEvent,
+  deleteUploadedCsv,
   runForecast,
   runNlqQuery,
   uploadAnalyticsCsv,
 } from '../../services/analyticsApi'
 
+const toDateString = (date) => (date ? date.toISOString().split('T')[0] : null)
+
 export function getDateRangePayload(dateRange) {
   return {
-    startDate: dateRange.startDate ? dateRange.startDate.toISOString().split('T')[0] : null,
-    endDate: dateRange.endDate ? dateRange.endDate.toISOString().split('T')[0] : null,
+    startDate: toDateString(dateRange.startDate),
+    endDate: toDateString(dateRange.endDate),
   }
 }
 
+// first server message found in `keys`
+function getApiError(error, fallback, keys = ['message', 'error']) {
+  const data = error?.response?.data
+  for (const key of keys) {
+    if (data?.[key]) return data[key]
+  }
+  return fallback
+}
+
 function zipForecastPoints(forecast) {
-  if (!forecast || !Array.isArray(forecast.dates)) return []
+  if (!Array.isArray(forecast?.dates)) return []
 
   return forecast.dates.map((date, i) => ({
-    date,
     predicted_revenue: forecast.ensemble_forecast?.[i] ?? forecast.xgboost_forecast?.[i] ?? 0,
     yhat_lower: forecast.lower_bound?.[i] ?? 0,
     yhat_upper: forecast.upper_bound?.[i] ?? 0,
   }))
 }
 
-function normalizeAnomalyItems(anomalies) {
-  if (!anomalies?.anomalies?.length) return []
-  if (!Array.isArray(anomalies.anomalies)) return []
+function normalizeAnomalyItems(items) {
+  if (!Array.isArray(items)) return []
 
-  return anomalies.anomalies.map((a) => ({
+  return items.map((a) => ({
     date: a.date,
     type: a.method || a.explanation?.split(':')[0] || 'unknown',
     severity: a.severity || 'warning',
@@ -44,19 +57,15 @@ function normalizeAnomalyItems(anomalies) {
 }
 
 function normalizeAnalyticsPayload(payload) {
-  const forecast = Array.isArray(payload?.forecast)
-    ? payload.forecast
-    : zipForecastPoints(payload?.forecast)
-
-  const anomalies = payload?.anomalies?.anomalies
-    ? normalizeAnomalyItems(payload.anomalies)
-    : Array.isArray(payload?.anomalies)
-      ? normalizeAnomalyItems({ anomalies: payload.anomalies })
-      : []
+  const rawForecast = payload?.forecast
+  const rawAnomalies = payload?.anomalies
 
   return {
-    forecast,
-    anomalies,
+    forecast: Array.isArray(rawForecast) ? rawForecast : zipForecastPoints(rawForecast),
+    // accepts { anomalies: [...] } or a bare array
+    anomalies: normalizeAnomalyItems(
+      Array.isArray(rawAnomalies) ? rawAnomalies : rawAnomalies?.anomalies,
+    ),
     fileName: payload?.fileName || null,
     uploadedAt: payload?.uploadedAt || null,
   }
@@ -73,9 +82,32 @@ function normalizeNlqResult(payload) {
   }
 }
 
+// runs `load` when deps change, ignoring stale results
+function useLoadEffect(load, onSuccess, onError, deps) {
+  useEffect(() => {
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const res = await load()
+        if (!cancelled) onSuccess(res)
+      } catch {
+        if (!cancelled) onError()
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+}
+
+// -- Hooks -- //
 export function useAnalyticsData(dateRange) {
-  const [forecastData, setForecastData] = useState({ forecast: [], anomalies: [] })
+  const [forecastPts, setForecastPts] = useState([])
   const [anomalies, setAnomalies] = useState([])
+  const [uploadedFileName, setUploadedFileName] = useState('')
   const [csvFile, setCsvFile] = useState(null)
   const [loadingForecast, setLoadingForecast] = useState(false)
   const [loadingAnomalies, setLoadingAnomalies] = useState(false)
@@ -87,92 +119,81 @@ export function useAnalyticsData(dateRange) {
   const [statusMsg, setStatusMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [revenueTrendPts, setRevenueTrendPts] = useState([])
+  const [uploadedCsvs, setUploadedCsvs] = useState([])
+  const [activatingCsvId, setActivatingCsvId] = useState(null)
+  const [customEvents, setCustomEvents] = useState([])
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
-  const forecastPts = forecastData.forecast || []
   const hasData = forecastPts.length > 0 || anomalies.length > 0
 
-  const queryCols = useMemo(() => {
-    if (!queryResult?.rows?.length) {
-      return []
+  const queryCols = useMemo(
+    () => (queryResult?.rows?.length ? Object.keys(queryResult.rows[0]) : []),
+    [queryResult],
+  )
+
+  // -- Initial loads -- //
+  useLoadEffect(
+    fetchUploadedCsvs,
+    (res) => {
+      const uploads = Array.isArray(res?.uploads) ? res.uploads : []
+      setUploadedCsvs(uploads)
+      setCustomEvents(uploads.find((u) => u.isActive)?.customEvents || [])
+    },
+    () => setUploadedCsvs([]),
+    [],
+  )
+
+  useLoadEffect(
+    fetchSavedForecast,
+    (res) => {
+      const norm = normalizeAnalyticsPayload(res)
+      setForecastPts(norm.forecast)
+      setAnomalies(norm.anomalies)
+      setUploadedFileName(norm.fileName || '')
+    },
+    () => {
+      setForecastPts([])
+      setAnomalies([])
+    },
+    [],
+  )
+
+  useLoadEffect(
+    fetchNlqHistory,
+    (res) => setQueryHistory(Array.isArray(res?.history) ? res.history : []),
+    () => setQueryHistory([]),
+    [],
+  )
+
+  useLoadEffect(
+    () => fetchRevenueTrend(getDateRangePayload(dateRange)),
+    (res) => setRevenueTrendPts(res?.points || []),
+    () => setRevenueTrendPts([]),
+    [dateRange],
+  )
+
+  // -- shared actions -- //
+  const startAction = () => {
+    setStatusMsg('')
+    setErrorMsg('')
+  }
+
+  const applyAnalytics = (norm) => {
+    setForecastPts(norm.forecast)
+    setAnomalies(norm.anomalies)
+  }
+
+  // failures are ignored so callers still succeed
+  const refreshRevenueTrend = async () => {
+    try {
+      const res = await fetchRevenueTrend(getDateRangePayload(dateRange))
+      setRevenueTrendPts(res?.points || [])
+    } catch {
+      // ignore
     }
+  }
 
-    return Object.keys(queryResult.rows[0])
-  }, [queryResult])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadSavedAnalytics() {
-      try {
-        const res = await fetchSavedForecast()
-
-        if (cancelled) return
-
-        const norm = normalizeAnalyticsPayload(res)
-        setForecastData((cur) => ({ ...cur, ...norm }))
-        setAnomalies(norm.anomalies)
-      } catch {
-        if (!cancelled) {
-          setForecastData({ forecast: [], anomalies: [] })
-          setAnomalies([])
-        }
-      }
-    }
-
-    loadSavedAnalytics()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadHistory() {
-      try {
-        const res = await fetchNlqHistory()
-
-        if (cancelled) return
-
-        setQueryHistory(Array.isArray(res?.history) ? res.history : [])
-      } catch {
-        if (!cancelled) {
-          setQueryHistory([])
-        }
-      }
-    }
-
-    loadHistory()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadRevenueTrend() {
-      try {
-        const res = await fetchRevenueTrend(getDateRangePayload(dateRange))
-        if (!cancelled) {
-          setRevenueTrendPts(res?.points || [])
-        }
-      } catch {
-        if (!cancelled) {
-          setRevenueTrendPts([])
-        }
-      }
-    }
-
-    loadRevenueTrend()
-
-    return () => {
-      cancelled = true
-    }
-  }, [dateRange])
-
+  // -- Analytics actions -- //
   const runSavedForecast = async () => {
     if (!hasData) {
       setErrorMsg('Upload a CSV first so the model has data to forecast.')
@@ -180,17 +201,15 @@ export function useAnalyticsData(dateRange) {
     }
 
     setLoadingForecast(true)
-    setStatusMsg('')
-    setErrorMsg('')
+    startAction()
 
     try {
-      const res = await runForecast(getDateRangePayload(dateRange))
-      const norm = normalizeAnalyticsPayload(res)
-      setForecastData((cur) => ({ ...cur, ...norm }))
-      setAnomalies(norm.anomalies.length ? norm.anomalies : anomalies)
+      const norm = normalizeAnalyticsPayload(await runForecast(getDateRangePayload(dateRange)))
+      setForecastPts(norm.forecast)
+      if (norm.anomalies.length) setAnomalies(norm.anomalies)
       setStatusMsg('Forecast updated from the model output.')
     } catch (error) {
-      setErrorMsg(error?.response?.data?.message || error?.response?.data?.error || 'Forecast endpoint is not ready yet or returned no data.')
+      setErrorMsg(getApiError(error, 'Forecast endpoint is not ready yet or returned no data.'))
     } finally {
       setLoadingForecast(false)
     }
@@ -198,24 +217,20 @@ export function useAnalyticsData(dateRange) {
 
   const refreshAnomalies = async () => {
     if (!hasData) {
-      setErrorMsg('Upload a CSV first so anomaly flags can be generated.')
+      setErrorMsg('Upload a CSV first')
       return
     }
 
     setLoadingAnomalies(true)
-    setStatusMsg('')
-    setErrorMsg('')
+    startAction()
 
     try {
-      const res = await fetchAnomalies(getDateRangePayload(dateRange))
-      const norm = normalizeAnalyticsPayload(res)
+      const norm = normalizeAnalyticsPayload(await fetchAnomalies(getDateRangePayload(dateRange)))
       setAnomalies(norm.anomalies)
-      if (norm.forecast.length) {
-        setForecastData((cur) => ({ ...cur, ...norm }))
-      }
+      if (norm.forecast.length) setForecastPts(norm.forecast)
       setStatusMsg('Anomalies refreshed from the model output.')
     } catch (error) {
-      setErrorMsg(error?.response?.data?.message || error?.response?.data?.error || 'Anomaly endpoint is not ready yet or returned no data.')
+      setErrorMsg(getApiError(error, 'Anomaly endpoint is not ready yet or returned no data.'))
     } finally {
       setLoadingAnomalies(false)
     }
@@ -228,58 +243,58 @@ export function useAnalyticsData(dateRange) {
     }
 
     setLoadingUpload(true)
-    setStatusMsg('')
-    setErrorMsg('')
+    startAction()
 
     try {
       const fd = new FormData()
       fd.append('file', file)
       const res = await uploadAnalyticsCsv(fd)
       const norm = normalizeAnalyticsPayload(res)
-      setForecastData((cur) => ({ ...cur, ...norm }))
-      setAnomalies(norm.anomalies)
+
+      applyAnalytics(norm)
+      setUploadedFileName(norm.fileName || file.name)
       setStatusMsg(res.message || 'CSV uploaded successfully. Model output received.')
       setCsvFile(null)
 
-      // Refresh the revenue trend now that new data exists
+      // upload still succeeds if these refreshes fail
       try {
-        const trendRes = await fetchRevenueTrend(getDateRangePayload(dateRange))
-        setRevenueTrendPts(trendRes?.points || [])
+        const uploadsRes = await fetchUploadedCsvs()
+        setUploadedCsvs(Array.isArray(uploadsRes?.uploads) ? uploadsRes.uploads : [])
       } catch {
-        // trend refresh failing shouldn't block the upload success state
+        // ignore
       }
+      await refreshRevenueTrend()
     } catch (error) {
-      const responseData = error?.response?.data
       setErrorMsg(
-        responseData?.error ||
-        responseData?.message ||
-        'Upload failed or the model endpoint did not return analytics data.'
+        getApiError(
+          error,
+          'Upload failed or the model endpoint did not return analytics data.',
+          ['error', 'message'],
+        ),
       )
     } finally {
       setLoadingUpload(false)
     }
   }
 
+  // -- Natural language query -- //
   const submitQuery = async (question) => {
     const q = String(question || queryText).trim()
-
     if (!q) {
       setErrorMsg('Ask a question first.')
       return
     }
 
     setLoadingQuery(true)
-    setStatusMsg('')
-    setErrorMsg('')
+    startAction()
 
     try {
-      const res = await runNlqQuery({ question: q })
-      const norm = normalizeNlqResult(res)
+      const norm = normalizeNlqResult(await runNlqQuery({ question: q }))
 
       setQueryResult(norm)
       setQueryText(norm.question)
-      setQueryHistory((current) => {
-        const nextHist = [
+      setQueryHistory((current) =>
+        [
           {
             question: norm.question,
             timestamp: new Date().toISOString(),
@@ -287,22 +302,12 @@ export function useAnalyticsData(dateRange) {
             method: norm.method,
           },
           ...current.filter((item) => item.question !== norm.question),
-        ]
-
-        return nextHist.slice(0, 10)
-      })
-
+        ].slice(0, MAX_QUERY_HISTORY),
+      )
       setStatusMsg('Query executed.')
     } catch {
       setErrorMsg('NLQ endpoint is not ready yet or returned an error.')
-      setQueryResult({
-        question: q,
-        sql: '',
-        confidence: 0,
-        method: 'error',
-        rows: [],
-        row_count: 0,
-      })
+      setQueryResult({ question: q, sql: '', confidence: 0, method: 'error', rows: [], row_count: 0 })
     } finally {
       setLoadingQuery(false)
     }
@@ -311,6 +316,64 @@ export function useAnalyticsData(dateRange) {
   const loadHistoryQuery = (item) => {
     setQueryText(item.question)
     submitQuery(item.question)
+  }
+
+  // -- Upload management -- //
+  const activateCsv = async (id) => {
+    setActivatingCsvId(id)
+    startAction()
+
+    try {
+      const norm = normalizeAnalyticsPayload(await activateUploadedCsv(id))
+
+      applyAnalytics(norm)
+      setUploadedFileName(norm.fileName || '')
+      setUploadedCsvs((current) => current.map((u) => ({ ...u, isActive: u.id === id })))
+      setStatusMsg(`${norm.fileName || 'Uploaded CSV'} activated.`)
+
+      await refreshRevenueTrend()
+    } catch (error) {
+      setErrorMsg(getApiError(error, 'CSV activation failed', ['message']))
+    } finally {
+      setActivatingCsvId(null)
+    }
+  }
+
+  const addCustomEvent = async (date, name) => {
+    const trimmedName = name.trim()
+    if (!date || !trimmedName) {
+      setErrorMsg('Choose a date and enter an event name.')
+      return
+    }
+
+    try {
+      const res = await saveAnalyticsEvent(date, trimmedName)
+      const events = res.events || []
+
+      setCustomEvents(events)
+      setUploadedCsvs((current) =>
+        current.map((u) => (u.isActive ? { ...u, customEvents: events } : u)),
+      )
+      setStatusMsg(`Event added: ${trimmedName}`)
+      await refreshAnomalies()
+    } catch (error) {
+      setErrorMsg(getApiError(error, 'Could not save the event.', ['message']))
+    }
+  }
+
+  const confirmDeleteCsv = async () => {
+    if (!deleteTarget) return
+
+    try {
+      await deleteUploadedCsv(deleteTarget.id)
+      setUploadedCsvs((current) => current.filter((u) => u.id !== deleteTarget.id))
+      setStatusMsg(`${deleteTarget.fileName} deleted.`)
+      setCustomEvents([])
+    } catch (error) {
+      setErrorMsg(getApiError(error, 'Could not delete the CSV.', ['message']))
+    } finally {
+      setDeleteTarget(null)
+    }
   }
 
   return {
@@ -338,5 +401,14 @@ export function useAnalyticsData(dateRange) {
     loadHistoryQuery,
     uploadCsv,
     revenueTrendPts,
+    uploadedFileName,
+    uploadedCsvs,
+    activatingCsvId,
+    activateCsv,
+    customEvents,
+    deleteTarget,
+    setDeleteTarget,
+    addCustomEvent,
+    confirmDeleteCsv,
   }
 }
