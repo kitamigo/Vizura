@@ -135,11 +135,6 @@ function Payroll() {
   return (
     <div className="relative min-h-full overflow-x-hidden px-4 pb-8 pt-0 text-slate-900 sm:px-6 lg:px-8 dark:text-slate-100">
       <div className="mx-auto max-w-[1600px] space-y-6">
-        <section className="flex flex-col gap-4 pb-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-          </div>
-        </section>
-
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             ['Gross pay', money(grossPay), publishedShifts.length ? 'Live roster' : 'No roster'],

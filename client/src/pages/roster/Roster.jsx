@@ -369,7 +369,7 @@ export default function Rostering() {
   const rangeLabel = `${range.start.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })} - ${range.end.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`
 
   return (
-    <div className="roster-page bg-transparent p-4 sm:p-6">
+    <div className="roster-page bg-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
       <div className="mx-auto max-w-[1600px]">
         <section className="mb-5 grid gap-3 sm:grid-cols-2">
           <div className="roster-stat-card">

@@ -23,11 +23,11 @@ export function ForecastTrendChart({ data, compact = false }) {
   const yTicks = getNiceTicks(min, max)
 
   return (
-    <div className="relative">
-      <div className="mb-2 h-6 text-sm font-medium text-slate-700 dark:text-slate-200">
+    <div className={`relative ${compact ? 'flex h-full min-h-0 flex-col' : ''}`}>
+      <div className="mb-2 h-6 flex-none text-sm font-medium text-slate-700 dark:text-slate-200">
         {selected ? `${formatDDMMYY(selected.date)} — $${selected.revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'Click a point to see its value'}
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className={`${compact ? 'h-44' : 'h-64'} w-full`}>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className={`${compact ? 'min-h-0 flex-1' : 'h-64'} block w-full`}>
         <defs>
           <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.25" />
@@ -118,7 +118,7 @@ export function ForecastBandChart({ data, compact = false }) {
   const min = Math.min(...vals)
   const max = Math.max(...vals)
   const rng = max - min || 1
-  const xStep = data.length > 1 ? (width - padding * 2) / (data.length - 1) : 0
+  const xStep = normalized.length > 1 ? (width - padding * 2) / (normalized.length - 1) : 0
 
   const scaleY = (value) => height - padding - ((value - min) / rng) * (height - padding * 2)
   const scaleX = (index) => padding + index * xStep
@@ -135,7 +135,7 @@ export function ForecastBandChart({ data, compact = false }) {
   const labelEvery = Math.max(1, Math.ceil(normalized.length / 8))
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className={`${compact ? 'h-44' : 'h-64'} w-full`}>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className={`${compact ? 'h-full min-h-0' : 'h-64'} w-full`}>
       <defs>
         <linearGradient id="forecast-band" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.28" />

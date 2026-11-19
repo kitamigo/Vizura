@@ -1,5 +1,6 @@
 export const demoRosterStorageKey = 'vizura-demo-roster'
 export const demoRosterChangedEvent = 'vizura-demo-roster-changed'
+export const excludedDemoEmployeeId = '1'
 
 export const testEmployee = {
   id: 1,
@@ -9,17 +10,7 @@ export const testEmployee = {
 }
 
 export function getInitialDemoShifts() {
-  const start = new Date()
-  start.setHours(9, 0, 0, 0)
-  return [{
-    Id: 1,
-    Subject: 'Test shift',
-    StartTime: start,
-    EndTime: new Date(start.getTime() + 8 * 60 * 60 * 1000),
-    EmployeeId: testEmployee.id,
-    RosterId: 1,
-    IsPublished: false,
-  }]
+  return []
 }
 
 export function readDemoShifts() {
@@ -27,17 +18,20 @@ export function readDemoShifts() {
   if (!stored) return getInitialDemoShifts()
 
   try {
-    return JSON.parse(stored).map((shift) => ({
+    return JSON.parse(stored)
+      .filter((shift) => String(shift.EmployeeId) !== excludedDemoEmployeeId)
+      .map((shift) => ({
       ...shift,
       StartTime: new Date(shift.StartTime),
       EndTime: new Date(shift.EndTime),
-    }))
+      }))
   } catch {
     return getInitialDemoShifts()
   }
 }
 
 export function writeDemoShifts(shifts) {
-  localStorage.setItem(demoRosterStorageKey, JSON.stringify(shifts))
+  const activeShifts = shifts.filter((shift) => String(shift.EmployeeId) !== excludedDemoEmployeeId)
+  localStorage.setItem(demoRosterStorageKey, JSON.stringify(activeShifts))
   window.dispatchEvent(new Event(demoRosterChangedEvent))
 }

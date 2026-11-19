@@ -1,0 +1,347 @@
+
+
+Bachelor of Software Engineering
+
+Investigative Studio III
+
+Software Requirements Document (SRS)
+
+Nakita Henry (270210724)
+Jack Crichton (270399561)
+
+Date of submission
+19/05/2026
+TABLE OF CONTENTS
+	 TOC \o "1-3" \h \z \u TABLE OF CONTENTS	 PAGEREF _Toc227516614 \h 1
+	1. INTRODUCTION	 PAGEREF _Toc227516615 \h 2
+	1.1. Purpose	 PAGEREF _Toc227516616 \h 2
+	1.2. Project Scope	 PAGEREF _Toc227516617 \h 2
+	        1.2.1. In Scope	 PAGEREF _Toc227516618 \h 2
+	        1.2.2. Out of Scope	 PAGEREF _Toc227516619 \h 2
+	1.3. Definitions and Acronyms	 PAGEREF _Toc227516620 \h 3
+	1.4. Document Conventions	 PAGEREF _Toc227516621 \h 3
+	2. OVERALL DESCRIPTION	 PAGEREF _Toc227516622 \h 4
+	2.1. User Needs	 PAGEREF _Toc227516623 \h 4
+	2.2. Assumptions	 PAGEREF _Toc227516624 \h 4
+	2.3. Dependencies	 PAGEREF _Toc227516625 \h 4
+	3. FUNCTIONAL REQUIREMENTS	 PAGEREF _Toc227516626 \h 4
+	3.1. Authentication and Access	 PAGEREF _Toc227516627 \h 5
+	3.2. Analytics and Forecasting	 PAGEREF _Toc227516628 \h 5
+	3.3. Rostering	 PAGEREF _Toc227516629 \h 5
+	3.4. Payroll	 PAGEREF _Toc227516630 \h 5
+	3.5. Employee Management	 PAGEREF _Toc227516631 \h 6
+	4. NON-FUNCTIONAL REQUIREMENTS	 PAGEREF _Toc227516632 \h 6
+	4.1. Performance	 PAGEREF _Toc227516633 \h 6
+	4.2. Security	 PAGEREF _Toc227516634 \h 6
+	4.3. Reliability and Availability	 PAGEREF _Toc227516635 \h 6
+	4.4. Usability and Accessibility	 PAGEREF _Toc227516636 \h 7
+	4.5. Compliance	 PAGEREF _Toc227516637 \h 7
+	5. UML DIAGRAMS	 PAGEREF _Toc227516638 \h 8
+	5.1. Class Diagrams	 PAGEREF _Toc227516639 \h 8
+	5.2. Activity Diagrams	 PAGEREF _Toc227516640 \h 9
+	USE CASE DIAGRAMS	 PAGEREF _Toc227516641 \h 14
+	FLOWCHART DIAGRAM	 PAGEREF _Toc227516642 \h 16
+	CITATIONS	 PAGEREF _Toc227516643 \h 17
+	APPENDIX A: CLASS DIAGRAMS	 PAGEREF _Toc227516644 \h 18
+
+1.1. Purpose
+This document defines the functional and non-functional requirements of Vizura, a cloud-based business operations platform for small New Zealand (NZ) businesses. Following the layout of  Enabel (2025), this document will primarily be used by the Kija development team, any assessors, and any stakeholders interested in reviewing this project.
+
+1.2. Project Scope
+Vizura is a web-based platform that combines four key operational functions, consisting of sales analytics and forecasting, rostering, payroll, and employee management, into a singular system. Its initial development will be focused on small retail/hospitality businesses in NZ. Vizura, however, was not designed to replace full-scale accounting software (i.e. Xero), nor will it contain point-of-sale. inventory management, or customer relationship management functionality.
+
+1.2.1. In Scope
+For the MVP, Vizura will provide the following key components:
+User Management: Registration, authentication, and role-based profile management.
+Sales Data: CSV/Excel Upload option and manual entry with basic data cleaning.
+Analytics and Forecasting: Dashboards showing trend visualisations.
+NLQ Interface: A layer that allows plain English inquiries and responses for historical sales data.
+Payroll: Automated pay calculations, HA2003 and ERA2000 calculations, and PDF payslip Generations.
+Rostering: Drag and drop scheduling with availability checking, shift swapping, and leave requests.
+Employee Management: Employee records, contracts, leave/swap requests, and personal dashboards.
+Deployment: Vizura will be hosted on AWS.
+Localisation: NZ English will be the default language, as well as NZ date/time zone, and NZ public holidays.
+
+1.2.2. Out of Scope
+For the MVP, the following will be excluded but possibly be considered in further iterations:
+Full accounting functionality (Like Xero)
+Point-of-sale.
+Inventory Management.
+Customer Relationship Management.
+Physical hardware hosting (Cloud hosted for now)
+Broad/open-ended NLQ.
+Mobile Applications (The MVP will initially be web-based)
+Offline capabilities.
+
+1.3. Definitions and Acronyms
+Acronym
+Definition
+API
+Application Programming Interface
+AWS
+Amazon Web Services
+CSV
+Comma-Separated Values
+ERA2000
+Employment Relations Act 2000
+HA2003
+Holidays Act 2003
+PDF
+Portable Document Format
+NLQ
+Natural Language Query
+NZ
+New Zealand
+MVP
+Minimum Viable Product
+SRS
+Software Requirements Specification
+UML
+Unified Modeling Language
+
+1.4. Document Conventions
+This document follows these conventions:
+Term
+Description
+SHALL
+“Refers to a mandatory requirement that must be fulfilled during Phase 1 of platform development. The vendor/developer is required to cover this feature in the current implementation phase.”  ADDIN ZOTERO_ITEM CSL_CITATION {"citationID":"ub1ZlG2v","properties":{"unsorted":false,"formattedCitation":"(Enabel 2025)","plainCitation":"(Enabel 2025)","noteIndex":0},"citationItems":[{"id":3,"uris":["http://zotero.org/users/local/pqNQ3ETQ/items/ZG5FIF2C"],"itemData":{"id":3,"type":"document","publisher":"Belgian Agency for Development Cooperation.","title":"The development of AI-driven job matching platform.","URL":"https://www.enabel.be/app/uploads/2025/06/Annex-A-Detailed-Software-Requirements-Specification-SRS.pdf","author":[{"family":"Enabel","given":""}],"issued":{"date-parts":[["2025",5,19]]}}}],"schema":"https://github.com/citation-style-language/schema/raw/master/csl-citation.json"} (Enabel, 2025).
+SHOULD
+“Indicates a requirement that will take place in phase 2, and the developer should take it into consideration for future scalability.”  ADDIN ZOTERO_ITEM CSL_CITATION {"citationID":"rSW4nCsb","properties":{"unsorted":false,"formattedCitation":"(Enabel 2025)","plainCitation":"(Enabel 2025)","dontUpdate":true,"noteIndex":0},"citationItems":[{"id":3,"uris":["http://zotero.org/users/local/pqNQ3ETQ/items/ZG5FIF2C"],"itemData":{"id":3,"type":"document","publisher":"Belgian Agency for Development Cooperation.","title":"The development of AI-driven job matching platform.","URL":"https://www.enabel.be/app/uploads/2025/06/Annex-A-Detailed-Software-Requirements-Specification-SRS.pdf","author":[{"family":"Enabel","given":""}],"issued":{"date-parts":[["2025",5,19]]}}}],"schema":"https://github.com/citation-style-language/schema/raw/master/csl-citation.json"} (Enabel, 2025).
+MAY
+“Refers to a requirement anticipated for Phase 3 or subsequent phases. The developer is encouraged to consider this requirement generally, keeping future scalability in mind.”  ADDIN ZOTERO_ITEM CSL_CITATION {"citationID":"oeEGuBW5","properties":{"unsorted":false,"formattedCitation":"(Enabel 2025)","plainCitation":"(Enabel 2025)","dontUpdate":true,"noteIndex":0},"citationItems":[{"id":3,"uris":["http://zotero.org/users/local/pqNQ3ETQ/items/ZG5FIF2C"],"itemData":{"id":3,"type":"document","publisher":"Belgian Agency for Development Cooperation.","title":"The development of AI-driven job matching platform.","URL":"https://www.enabel.be/app/uploads/2025/06/Annex-A-Detailed-Software-Requirements-Specification-SRS.pdf","author":[{"family":"Enabel","given":""}],"issued":{"date-parts":[["2025",5,19]]}}}],"schema":"https://github.com/citation-style-language/schema/raw/master/csl-citation.json"} (Enabel, 2025).
+
+The requirements are categorised as follows:
+Requirement Number
+Description
+FR-XX
+Functional Requirements
+NFR-XX
+Non-Functional Requirements
+
+2. OVERALL DESCRIPTION
+
+2.1. User Needs
+Small NZ business owners currently face the difficulties of using multiple systems to handle their admin load. Multiple tabs, subscriptions, and a lack of data transfer can stretch the resources thinner than needed, and with this approach, these users can expect inefficiency and mistakes to occur commonly. Having all these tasks simplified into a consolidated and affordable source would allow these users to regain some of those crucial resources. 
+
+2.2. Assumptions
+Users will be able to access Vizura through up-to-date web browsers .
+Users will have and maintain a stable internet connection.
+Owners/admins will provide a minimum historical set of sales data.
+The AI and Payroll engines will run as separate microservices, accessible and provisioned.
+Accurate payroll information will be supplied for the calculations.
+
+2.3. Dependencies
+The availability of accurate and up-to-date legislation for payroll compliance.
+Sufficient quantity and quality of uploaded sales data for accuracy and forecasting.
+The continuous availability of AWS hosting and a reliable internet connection for users/backend services.
+
+3. FUNCTIONAL REQUIREMENTS
+The following content details the functional requirements of Vizura, categorised by major system features/modules. Each requirement is identifiable with its unique ID (FR-XX) for referencing.
+
+3.1. Authentication and Access
+ID
+Requirement
+FR-01
+The system SHALL authenticate users with credentials (emails and passwords)
+FR-02
+The system SHALL enforce role-based access control (employees have a personal dashboard only)
+FR-03
+The system SHALL allow users to reset their passwords via email
+FR-04
+The system SHALL allow users to register with their business name, email, and password
+
+3.2. Analytics and Forecasting
+ID
+Requirement
+FR-06
+The system SHALL allow admins to upload sales data via CSV/Excel format
+FR-07
+The system SHALL allow admins to enter data manually
+FR-08
+The system SHALL generate trend visualisations from that data
+FR-09
+The system SHALL generate 30 day revenue forecasting using an ensemble ML model
+FR-10
+The system SHALL provide a NLQ interface with plain English prompts/responses for sales data enquiries
+3.3. Rostering
+ID
+Requirement
+FR-11
+The system SHALL provide a drag-and-drop scheduling function
+FR-12
+The system SHALL allow admins to publish completed rosters
+FR-13
+The system SHALL detect and flag scheduling conflicts
+FR-14
+The system SHALL allow employees to submit leave and shift swap requests
+FR-15
+The system SHALL generate a PDF of a published roster
+
+3.4. Payroll
+ID
+Requirement
+FR-16
+The system SHALL calculate holiday pay at 8% (gross earnings)
+FR-17
+The system SHALL detect and apply public holiday rules 
+FR-18
+The system SHALL track and update annual leave entitlements 
+FR-19
+The system SHALL generate a PDF pay slip upon completion
+FR-20
+The system SHALL make payslips downloadable for all users
+
+3.5. Employee Management
+ID
+Requirement
+FR-21
+The system SHALL store staff records, including contract type, pay rate, start date, and position
+FR-22
+The system SHALL allow employees to submit leave requests
+FR-23
+The system SHALL send leave requests to appointed admin profiles for approval
+FR-24
+The system SHALL display a personal dashboard for each employee showing upcoming shifts, payslips, and leave balances (Holiday, sick, etc.)
+
+4. NON-FUNCTIONAL REQUIREMENTS
+The following content details the non-functional requirements for Vizura, defined by “quality attributes and constraints that the system must satisfy to meet requirements”  ADDIN ZOTERO_ITEM CSL_CITATION {"citationID":"uIHZjDhj","properties":{"unsorted":false,"formattedCitation":"(Enabel 2025)","plainCitation":"(Enabel 2025)","dontUpdate":true,"noteIndex":0},"citationItems":[{"id":3,"uris":["http://zotero.org/users/local/pqNQ3ETQ/items/ZG5FIF2C"],"itemData":{"id":3,"type":"document","publisher":"Belgian Agency for Development Cooperation.","title":"The development of AI-driven job matching platform.","URL":"https://www.enabel.be/app/uploads/2025/06/Annex-A-Detailed-Software-Requirements-Specification-SRS.pdf","author":[{"family":"Enabel","given":""}],"issued":{"date-parts":[["2025",5,19]]}}}],"schema":"https://github.com/citation-style-language/schema/raw/master/csl-citation.json"} (Enabel, 2025).
+
+4.1. Performance
+ID
+Requirement
+NFR-01
+The system SHOULD respond to UI requests within 2 seconds (normal load)
+NFR-02
+API endpoints that support UI SHALL respond to requests within 300ms (normal load)
+NFR-03
+Forecasting for small datasets SHALL respond to requests within 10 seconds (normal load)
+
+4.2. Security
+ID
+Requirement
+NFR-04
+All data SHALL be encrypted using HTTPS
+NFR-05
+The system SHALL support role-based access control for admin roles
+NFR-06
+The system SHALL be encrypted using industry-standard algorithms when data is at rest
+
+4.3. Reliability and Availability 
+ID
+Requirement
+NFR-07
+The core features (Payroll, compliance, rostering) SHOULD maintain 99% availability during working hours (8-6 pm)
+NFR-08
+The system SHALL function smoothly even when optional services (AI microservice) are unavailable
+NFR-09
+The system MAY provide documented maintenance windows and notify users ahead of time
+
+4.4. Usability and Accessibility 
+ID
+Requirement
+NFR-10
+The UI SHALL provide plain English responses and understand plain English queries
+NFR-11
+Core features SHOULD meet common assistive technologies (screen reader, keyboard navigation)
+NFR-12
+The system SHALL ensure all form elements have associated labelling
+
+4.5. Compliance 
+ID
+Requirement
+NFR-13
+The payroll and employee records SHALL be retained and exportable to PDF (NZ legal requirement)
+NFR-14
+The system SHOULD provide an auditable change history for policy changes or alterations to employee accounts
+NFR-15
+The system SHOULD maintain an incident response plan with a recorded timeline
+
+5. UML DIAGRAMS
+5.1. Class Diagrams
+2273304662170Figure  SEQ Figure \* ARABIC 1: UML Class Diagram – Vizura System
+Figure  SEQ Figure \* ARABIC 1: UML Class Diagram – Vizura System
+center13449
+This class diagram shows the full structure of Vizura. Showing every major part of the system (see Appendix A), it provides correlating data and how it connects to everything. Following a standard “UML graphical notation  ADDIN ZOTERO_ITEM CSL_CITATION {"citationID":"o27c4PxO","properties":{"unsorted":false,"formattedCitation":"(UML Class Diagram Tutorial n.d.)","plainCitation":"(UML Class Diagram Tutorial n.d.)","dontUpdate":true,"noteIndex":0},"citationItems":[{"id":4,"uris":["http://zotero.org/users/local/pqNQ3ETQ/items/75MQNLCE"],"itemData":{"id":4,"type":"webpage","title":"UML Class Diagram Tutorial","URL":"https://www.visual-paradigm.com/guide/uml-unified-modeling-language/uml-class-diagram-tutorial/","accessed":{"date-parts":[["2026",4,19]]}}}],"schema":"https://github.com/citation-style-language/schema/raw/master/csl-citation.json"} (Visual Paradigm, n.d.) each class is split into three sections covering the class name, attributes, and methods. Visibility markers show what is publicly accessible (+), and what is private (-).
+The relationships between the classes show that the Employee (see Appendix A, Figure A2) and Business (see Appendix A, Figure A8)  classes both inherit from the base class (User). It shows that the Payslip (see Appendix A, Figure A3) cannot run without the PayRun (see Appendix A, Figure A7)  class, and that Employee is connected to the Shifts (see Appendix A, Figure A5), LeaveRequests (see Appendix A, Figure A9), and Payslips across modules. For Kija, this is an essential blueprint for how Vizura’s database, API, and access controls should all be structured prior to any written code.
+
+5.2. Activity Diagrams
+To visualise the key system processes of Vizura, five activity diagrams are detailed below. Each diagram follows a specific flow from the initial state (beginning) through to the final state (end)  ADDIN ZOTERO_ITEM CSL_CITATION {"citationID":"IZaS2FHe","properties":{"unsorted":false,"formattedCitation":"(Athuraliya 2022)","plainCitation":"(Athuraliya 2022)","noteIndex":0},"citationItems":[{"id":6,"uris":["http://zotero.org/users/local/pqNQ3ETQ/items/R3U98JKT"],"itemData":{"id":6,"type":"webpage","abstract":"Activity diagram tutorial to learn and master how to draw an activity diagram. Learn about activity diagram definition, activity diagram symbols and more. Activity diagram examples and activity diagram templates to edit online instantly.","container-title":"Creately","language":"en","title":"Activity Diagram Tutorial | Easy Guide with Examples","URL":"https://creately.com/guides/activity-diagram-tutorial/","author":[{"family":"Athuraliya","given":"Amanda"}],"accessed":{"date-parts":[["2026",4,19]]},"issued":{"date-parts":[["2022",6,20]]}}}],"schema":"https://github.com/citation-style-language/schema/raw/master/csl-citation.json"} (Athuraliya, 2022). The core user interactions depicted are logging in, data upload for analytics and forecasting, roster building/publishing, payroll calculations, and employee leave requests. 
+
+9321808953500
+
+932180149225Figure  SEQ Figure \* ARABIC 2: Login and Authentication – Activity diagram
+Figure  SEQ Figure \* ARABIC 2: Login and Authentication – Activity diagram
+
+This login and authentication flow follows the user through accessing Vizura. Beginning with the login credentials (email and password), the system will validate them against stored data to check if they are correct. If incorrect, the system will notify the user and prompt the user to try again. If correct, the system will then check the user’s role (admin or employee) and then redirect them to the corresponding dashboard. The user is now logged in.
+12179305962650Figure 3: Analytics and Forecasting – Activity diagram
+Figure 3: Analytics and Forecasting – Activity diagram
+center7620000
+
+This analytics and forecasting flow follows the user through the process of inputting data, providing the user with the option to upload (CSV/Excel) or manually enter it. Once the data is in the system. It is processed and used to generate trend visualisations, then 30-day forecasts. The system also allows an optional NLQ branch where the admin can submit plain English questions and receive plain English responses. 
+center1905000
+128460590805Figure 4: Rostering – Activity diagram
+Figure 4: Rostering – Activity diagram
+
+This rostering diagram follows an admin user through the process of creating a roster, beginning with the selection of the roster builder. The admin will then assign shifts using the drag-and-drop shift scheduling, with the system checking for conflicts. If there is one detected, the admin will be prompted to solve it before the completion of the roster. Once done, the admin will be given the option to save the roster as a template before publishing.
+center000
+1598930112395Figure 5: Payroll – Activity diagram
+Figure 5: Payroll – Activity diagram
+
+This diagram shows the full payroll process, from initiation to completion. An admin will select a pay period, followed by the system automatically calculating the pay (gross) for all employees. After applying any relevant holiday pay, overtime, or holiday days, the system will check if the calculations are correct, recalculating if not, before confirming and generating PDF payslips. The payslips will then be made available for both the user and admin to download. 
+center1905000
+1295400112395Figure 6: Leave request – Activity diagram
+0Figure 6: Leave request – Activity diagram
+
+The fifth diagram follows a user through the leave request flow. The employee will begin by opening the form, selecting which type (unpaid, holiday, sick, etc.) of leave and the date/s. The system will then check the current balance (if paid or sick leave is selected) and, if insufficient, prompt the user with their current balance. Once everything is in order, the user will submit the request, sending a notification to the admin. If approved, the system will update the user's leave balance and notify the user. If declined, the system also notifies the user.
+
+USE CASE DIAGRAMS
+
+4559305239385Figure 7: Vizura Leave Request UML
+Figure 7: Vizura Leave Request UML
+center314960
+
+6845306238875Figure 8: Vizura UML Overview
+Figure 8: Vizura UML Overview
+center85
+
+ 
+
+FLOWCHART DIAGRAM
+-31754178935Figure 9: Vizura Flowchart Diagram
+Figure 9: Vizura Flowchart Diagram
+-34120This flowchart shows the full possible layout of user actions for our MVP at this stage. 
+CITATIONS
+ ADDIN ZOTERO_BIBL {"uncited":[],"omitted":[],"custom":[]} CSL_BIBLIOGRAPHY Athuraliya, A. (2022). Activity Diagram Tutorial | Easy Guide with Examples. https://creately.com/guides/activity-diagram-tutorial/.
+Enabel. (2025). The Development of AI-Driven Job Matching Platform. https://creately.com/demo-start/?tempId=jlg33xw41
+UML Class Diagram Tutorial. https://www.visual-paradigm.com/guide/uml-unified-modeling-language/uml-class-diagram-tutorial/.
+
+APPENDIX A: CLASS DIAGRAMS
+6832601200150033121601314450033147008265795Figure A6: Forecast class
+0Figure A6: Forecast class
+7715258265795Figure A5: Shift class
+00Figure A5: Shift class
+34290005313045Figure A4: Roster Class
+00Figure A4: Roster Class
+7715255608320Figure A3: Payslip class
+0Figure A3: Payslip class
+34290002322195Figure A2: Employee class
+00Figure A2: Employee class
+8001002465070Figure A1: User class
+00Figure A1: User class
+33191455880735006813555878830006858002751455003315335293433500
+
+34004256391275Figure A11: Leave Balance class
+00Figure A11: Leave Balance class
+34004258707755Figure A13: Sales Data class
+00Figure A13: Sales Data class
+7715258667750Figure A12: Shift Swap Request class
+00Figure A12: Shift Swap Request class
+7715255686425Figure A9: Leave Request class
+00Figure A9: Leave Request class
+34004254200525Figure A10: Analytics Query class
+00Figure A10: Analytics Query class
+34004252038350Figure A8: Business Class
+00Figure A8: Business Class
+7715252381250Figure A7: Payrun class
+00Figure A7: Payrun class
+65722562877700065722529845000065976500032994606508750003316605000329311021659850032931104333240

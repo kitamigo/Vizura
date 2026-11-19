@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   demoRosterChangedEvent,
+  excludedDemoEmployeeId,
   readDemoShifts,
 } from '../../services/demoRoster'
 import { fetchRevenueTrend, fetchSavedForecast } from '../../services/analyticsApi'
@@ -94,12 +95,14 @@ function EmployerDashboard() {
   {/* generates the table rows for the roster table */}
   const rosterEmployees = useMemo(() => {
     const merged = new Map()
-    employees.forEach((employee) => merged.set(String(employee.id), {
+    employees
+      .filter((employee) => String(employee.id) !== excludedDemoEmployeeId)
+      .forEach((employee) => merged.set(String(employee.id), {
       id: employee.id,
       name: `${employee.firstName || ''} ${employee.lastName || ''}`.trim() || 'Unnamed employee',
       role: employee.category || employee.employmentType || 'Employee',
       hourlyRate: Number(employee.hourlyRate || 0),
-    }))
+      }))
     shifts.forEach((shift) => {
       const key = String(shift.EmployeeId ?? '')
       if (key && !merged.has(key)) {
@@ -223,7 +226,7 @@ function EmployerDashboard() {
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Forecast chart</h2>
             <p className="text-xs text-slate-500 dark:text-sky-100/70">Projected revenue (next 6 months)</p>
-            <div className="mt-2 flex-1 rounded-lg border border-sky-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/40">
+            <div className="mt-2 min-h-0 flex-1 overflow-hidden rounded-lg border border-sky-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/40">
               <ForecastBandChart data={dashboardForecast} compact />
             </div>
           </article>
@@ -231,7 +234,7 @@ function EmployerDashboard() {
           <article className={panelClass}>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Revenue chart</h2>
             <p className="text-xs text-slate-500 dark:text-sky-100/70">Revenue trend (latest six months)</p>
-            <div className="mt-2 flex-1 rounded-lg border border-sky-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/40">
+            <div className="mt-2 min-h-0 flex-1 overflow-hidden rounded-lg border border-sky-100 bg-slate-50 p-1 dark:border-white/10 dark:bg-slate-950/40">
               <ForecastTrendChart data={latestRevenue} compact />
             </div>
           </article>
